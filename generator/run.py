@@ -56,7 +56,7 @@ SMALL_CONFIG = {
     "max_ratio_of_edges_vertices": 4,
     "max_pattern_counts": 1024,
 
-    "save_data_dir": r"/data/xliucr/SubIsoCnt/small",
+    "save_data_dir": r"../data/small",
     "num_workers": 16
 }
 
@@ -80,11 +80,34 @@ LARGE_CONFIG = {
     "max_ratio_of_edges_vertices": 4,
     "max_pattern_counts": 4096,
 
-    "save_data_dir": r"/data/xliucr/SubIsoCnt/large",
+    "save_data_dir": r"../data/large",
     "num_workers": 16
 }
 
-CONFIG = DEBUG_CONFIG
+SCALE_CONFIG={
+    "max_subgraph": 300000000,
+
+    "alphas": [0.05, 0.1, 0.15],
+
+    "number_of_patterns": 2,
+    "number_of_pattern_vertices": [4, 8, 16],
+    "number_of_pattern_edges": [4, 8, 16],
+    "number_of_pattern_vertex_labels": [4, 8, 16, 32],
+    "number_of_pattern_edge_labels": [4, 8, 16, 32],
+
+    "number_of_graphs": 10,  # train:dev:test = 8:1:1
+    "number_of_graph_vertices": [900000, 1000000, 1200000],
+    "number_of_graph_edges": [1800000, 2000000, 2400000],
+    "number_of_graph_vertex_labels": [8, 16, 32],
+    "number_of_graph_edge_labels": [8, 16, 32],
+
+    "max_ratio_of_edges_vertices": 4,
+    "max_pattern_counts": 4096000000,
+
+    "save_data_dir": r"../data/scale",
+    "num_workers": 48
+}
+CONFIG = SCALE_CONFIG
 
 def generate_graphs(graph_generator, number_of_graph_vertices, number_of_graph_edges, number_of_graph_vertex_labels, number_of_graph_edge_labels,
     alpha, max_pattern_counts, max_subgraph, number_of_graphs, save_graph_dir, save_metadata_dir):

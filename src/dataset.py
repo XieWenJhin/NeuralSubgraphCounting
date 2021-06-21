@@ -286,11 +286,19 @@ class GraphAdjDataset(data.Dataset):
 
     @staticmethod
     def preprocess(x):
+        mapping = x["mapping"]
+        u, v = mapping[0][0], mapping[1][0]
+        u1, v1 = mapping[0][1], mapping[1][1]
+
         pattern = x["pattern"]
         pattern_dglgraph = GraphAdjDataset.graph2dglgraph(pattern)
         pattern_dglgraph.ndata["indeg"] = np.array(pattern.indegree(), dtype=np.float32)
         pattern_dglgraph.ndata["label"] = np.array(pattern.vs["label"], dtype=np.int64)
         pattern_dglgraph.ndata["id"] = np.arange(0, pattern.vcount(), dtype=np.int64)
+        pattern_weights = torch.zeros(pattern_dglgraph.number_of_nodes(), 8)
+        pattern_weights[u,] = 1
+        pattern_weights[v,] = 1
+        pattern_dglgraph.ndata["w"] = pattern_weights
         pattern_dglgraph.edata["label"] = np.array(pattern.es["label"], dtype=np.int64)
 
         graph = x["graph"]
@@ -298,6 +306,10 @@ class GraphAdjDataset(data.Dataset):
         graph_dglgraph.ndata["indeg"] = np.array(graph.indegree(), dtype=np.float32)
         graph_dglgraph.ndata["label"] = np.array(graph.vs["label"], dtype=np.int64)
         graph_dglgraph.ndata["id"] = np.arange(0, graph.vcount(), dtype=np.int64)
+        graph_weights = torch.zeros(graph_dglgraph.number_of_nodes(), 8)
+        graph_weights[u1,] = 1
+        graph_weights[v1,] = 1
+        graph_dglgraph.ndata["w"] = graph_weights
         graph_dglgraph.edata["label"] = np.array(graph.es["label"], dtype=np.int64)
 
         subisomorphisms = np.array(x["subisomorphisms"], dtype=np.int32).reshape(-1, x["pattern"].vcount())

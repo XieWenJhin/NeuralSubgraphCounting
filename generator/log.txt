@@ -1,0 +1,34 @@
+nohup: ignoring input
+srun: job 273315 queued and waiting for resources
+srun: job 273315 has been allocated resources
+patterns_id P_N4_E4_NL4_EL4
+patterns_id P_N4_E8_NL4_EL4
+patterns_id P_N4_E8_NL4_EL8
+patterns_id P_N4_E16_NL4_EL4
+patterns_id P_N4_E16_NL4_EL8
+patterns_id P_N4_E16_NL4_EL16
+patterns_id P_N8_E8_NL4_EL4
+patterns_id P_N8_E8_NL4_EL8
+patterns_id P_N8_E16_NL4_EL4
+patterns_id P_N8_E16_NL4_EL8
+patterns_id P_N8_E16_NL4_EL16
+patterns_id P_N8_E8_NL8_EL4
+patterns_id P_N8_E8_NL8_EL8
+patterns_id P_N8_E16_NL8_EL4
+patterns_id P_N8_E16_NL8_EL8
+patterns_id P_N8_E16_NL8_EL16
+patterns_id P_N16_E16_NL4_EL4
+patterns_id P_N16_E16_NL4_EL8
+patterns_id P_N16_E16_NL4_EL16
+patterns_id P_N16_E16_NL8_EL4
+patterns_id P_N16_E16_NL8_EL8
+patterns_id P_N16_E16_NL8_EL16
+patterns_id P_N16_E16_NL16_EL4
+patterns_id P_N16_E16_NL16_EL8
+patterns_id P_N16_E16_NL16_EL16
+50 patterns generation finished!
+srun: forcing job termination
+srun: Job step aborted: Waiting up to 32 seconds for job step to finish.
+  0%|          | 0/10746 [00:00<?, ?it/s]slurmstepd-dell-gpu-19: error: *** STEP 273314.0 ON dell-gpu-19 CANCELLED AT 2021-06-11T21:37:05 ***
+srun: error: dell-gpu-19: task 0: Killed
+minated
