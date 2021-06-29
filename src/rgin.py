@@ -75,6 +75,10 @@ class RGIN(GraphAdjModel):
         if self.add_degree:
             p_dim += 1
             g_dim += 1
+        
+        #Notice: added attr encoding
+        p_dim += 12
+        g_dim += 12
         self.predict_net = self.create_predict_net(config["predict_net"],
             pattern_dim=p_dim, graph_dim=g_dim, hidden_dim=config["predict_net_hidden_dim"],
             num_heads=config["predict_net_num_heads"], recurrent_steps=config["predict_net_recurrent_steps"], 
@@ -225,10 +229,12 @@ class RGIN(GraphAdjModel):
         
         if self.add_enc and self.add_degree:
             pattern_enc, graph_enc = self.get_enc(pattern, pattern_len, graph, graph_len)
+            p_attr_enc, g_attr_enc = self.get_attr_enc(pattern, graph)
             if zero_mask is not None:
                 graph_enc.masked_fill_(zero_mask, 0.0)
-            pattern_output = torch.cat([pattern_enc, pattern_output, pattern.ndata["indeg"].unsqueeze(-1)], dim=1)
-            graph_output = torch.cat([graph_enc, graph_output, graph.ndata["indeg"].unsqueeze(-1)], dim=1)
+            #Notice: added attribute encoding
+            pattern_output = torch.cat([pattern_enc, pattern_output, p_attr_enc, pattern.ndata["indeg"].unsqueeze(-1)], dim=1)
+            graph_output = torch.cat([graph_enc, graph_output, g_attr_enc, graph.ndata["indeg"].unsqueeze(-1)], dim=1)
         elif self.add_enc:
             pattern_enc, graph_enc = self.get_enc(pattern, pattern_len, graph, graph_len)
             if zero_mask is not None:

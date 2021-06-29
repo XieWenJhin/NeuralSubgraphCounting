@@ -403,6 +403,9 @@ def _read_graphs_from_dir(dirpath):
             try:
                 graph = ig.read(os.path.join(dirpath, filename))
                 graph.vs["label"] = [int(x) for x in graph.vs["label"]]
+                graph.vs["A"] = [int(x) for x in graph.vs["A"]]
+                graph.vs["B"] = [int(x) for x in graph.vs["B"]]
+                graph.vs["C"] = [int(x) for x in graph.vs["C"]]
                 graph.es["label"] = [int(x) for x in graph.es["label"]]
                 graph.es["key"] = [int(x) for x in graph.es["key"]]
                 graphs[names[0]] = graph
@@ -467,10 +470,40 @@ def read_metadata_from_dir(dirpath, num_workers=4):
             meta[os.path.basename(subdir)] = x
     return meta
 
+def _read_literals_from_dir(dirpath):
+    literals = dict()
+    for filename in os.listdir(dirpath):
+        if not os.path.isdir(os.path.join(dirpath, filename)):
+            names = os.path.splitext(os.path.basename(filename))
+            if names[1] != ".literal":
+                continue
+            try:
+                with open(os.path.join(dirpath, filename), "r") as f:
+                    literals[names[0]] = json.load(f)
+            except BaseException as e:
+                print(e)
+    return literals
+
+def read_literals_from_dir(dirpath, num_workers=4):
+    literals = dict()
+    subdirs = _get_subdirs(dirpath)
+    with Pool(num_workers if num_workers > 0 else os.cpu_count()) as pool:
+        results = list()
+        for subdir in subdirs:
+            results.append((subdir, pool.apply_async(_read_literals_from_dir, args=(subdir, ))))
+        pool.close()
+        
+        for subdir, x in tqdm(results):
+            x = x.get()
+            literals.update(x)
+    return literals
+
 def load_data(graph_dir, pattern_dir, metadata_dir, num_workers=4):
     patterns = read_patterns_from_dir(pattern_dir, num_workers=num_workers)
     graphs = read_graphs_from_dir(graph_dir, num_workers=num_workers)
     meta = read_metadata_from_dir(metadata_dir, num_workers=num_workers)
+    #add read literals from file
+    literals = read_literals_from_dir(pattern_dir, num_workers=num_workers)
 
     train_data, dev_data, test_data = list(), list(), list()
     for p, pattern in patterns.items():
@@ -482,6 +515,7 @@ def load_data(graph_dir, pattern_dir, metadata_dir, num_workers=4):
                 x["graph"] = graph
                 x["subisomorphisms"] = meta[p][g]["subisomorphisms"]
                 x["counts"] = meta[p][g]["counts"]
+                x["literals"] = literals[p]["literals"]
 
                 g_idx = int(g.rsplit("_", 1)[-1])
                 if g_idx % 10 == 0:
@@ -498,6 +532,7 @@ def load_data(graph_dir, pattern_dir, metadata_dir, num_workers=4):
                 x["graph"] = graph
                 x["subisomorphisms"] = meta[p][g]["subisomorphisms"]
                 x["counts"] = meta[p][g]["counts"]
+                x["literals"] = literals[p]
 
                 g_idx = int(g.rsplit("_", 1)[-1])
                 if g_idx % 3 == 0:

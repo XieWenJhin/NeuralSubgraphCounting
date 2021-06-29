@@ -286,10 +286,40 @@ class GraphAdjDataset(data.Dataset):
 
     @staticmethod
     def preprocess(x):
+        #process literals
+        #Warning: only handle u.A = v.B !
+        literals = x["literals"]
+        u_A, v_B = literals.split('=')
+        u_A = u_A.strip()
+        v_B = v_B.strip()
+        u, A = u_A.split('.')
+        v, B = v_B.split('.')
+        u = int(u)
+        v = int(v)
+        C = ['A', 'B', 'C']
+
         pattern = x["pattern"]
         pattern_dglgraph = GraphAdjDataset.graph2dglgraph(pattern)
         pattern_dglgraph.ndata["indeg"] = np.array(pattern.indegree(), dtype=np.float32)
         pattern_dglgraph.ndata["label"] = np.array(pattern.vs["label"], dtype=np.int64)
+        
+        #for pattern, set x.A and y.B value, left set 0
+        u_A_val, v_B_val = pattern.vs[u][A], pattern.vs[v][B]
+        pattern.vs["A"] = pattern.vs["B"] = pattern.vs["C"] = 0
+        pattern.vs[u][A] = u_A_val
+        pattern.vs[v][B] = v_B_val
+        if A == B:
+            C.remove(A)
+            pattern_dglgraph.ndata[A] = np.array(pattern.vs[A], dtype=np.int64)
+            pattern_dglgraph.ndata[C[0]] = np.array(pattern.vs[C[0]], dtype=np.int64)
+            pattern_dglgraph.ndata[C[1]] = np.array(pattern.vs[C[1]], dtype=np.int64)
+        else:
+            C.remove(A)
+            C.remove(B)
+            pattern_dglgraph.ndata[A] = np.array(pattern.vs[A], dtype=np.int64)
+            pattern_dglgraph.ndata[B] = np.array(pattern.vs[B], dtype=np.int64)
+            pattern_dglgraph.ndata[C[0]] = np.array(pattern.vs[C[0]], dtype=np.int64)
+            
         pattern_dglgraph.ndata["id"] = np.arange(0, pattern.vcount(), dtype=np.int64)
         pattern_dglgraph.edata["label"] = np.array(pattern.es["label"], dtype=np.int64)
 
@@ -297,6 +327,9 @@ class GraphAdjDataset(data.Dataset):
         graph_dglgraph = GraphAdjDataset.graph2dglgraph(graph)
         graph_dglgraph.ndata["indeg"] = np.array(graph.indegree(), dtype=np.float32)
         graph_dglgraph.ndata["label"] = np.array(graph.vs["label"], dtype=np.int64)
+        graph_dglgraph.ndata["A"] = np.array(graph.vs["A"], dtype=np.int64)
+        graph_dglgraph.ndata["B"] = np.array(graph.vs["B"], dtype=np.int64)
+        graph_dglgraph.ndata["C"] = np.array(graph.vs["C"], dtype=np.int64)
         graph_dglgraph.ndata["id"] = np.arange(0, graph.vcount(), dtype=np.int64)
         graph_dglgraph.edata["label"] = np.array(graph.es["label"], dtype=np.int64)
 
