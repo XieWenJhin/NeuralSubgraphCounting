@@ -287,7 +287,7 @@ class GraphAdjDataset(data.Dataset):
     @staticmethod
     def preprocess(x):
         #process literals
-        #Warning: only handle u.A = v.B !
+        #Warning: temporary only handle u.A = v.B !
         literals = x["literals"]
         u_A, v_B = literals.split('=')
         u_A = u_A.strip()
@@ -296,34 +296,46 @@ class GraphAdjDataset(data.Dataset):
         v, B = v_B.split('.')
         u = int(u)
         v = int(v)
-        C = ['A', 'B', 'C']
 
+        attr_name  = ['A', 'B', 'C']
+        attr_range = [3, 3, 3]
+        
         pattern = x["pattern"]
+        graph = x["graph"]
+        #extend pattern based on literals
+        #target vertex: vlabel = MAX_V_LABEL_VALUE + 1, elabel = MAX_E_LABEL_VALUE + 1 + attribute_index
+        MAX_V_LABEL_VALUE = max(graph.vs["label"])
+        MAX_E_LABEL_VALUE = max(graph.es["label"])
+        
+        o_v_count = pattern.vcount()
+        pattern.add_vertices(1)
+        tid = o_v_count
+        pattern.vs[tid]["label"] = MAX_V_LABEL_VALUE + 1
+        pattern.add_edges([(u, tid),(v, tid)])
+        
+        u_2_t, v_2_t = pattern.get_eid(u, tid), pattern.get_eid(v, tid)
+        pattern.es[u_2_t]["label"] = MAX_E_LABEL_VALUE + 1 + attr_name.index(A)
+        pattern.es[v_2_t]["label"] = MAX_E_LABEL_VALUE + 1 + attr_name.index(B)
+
         pattern_dglgraph = GraphAdjDataset.graph2dglgraph(pattern)
         pattern_dglgraph.ndata["indeg"] = np.array(pattern.indegree(), dtype=np.float32)
         pattern_dglgraph.ndata["label"] = np.array(pattern.vs["label"], dtype=np.int64)
-        
-        #for pattern, set x.A and y.B value, left set 0
-        u_A_val, v_B_val = pattern.vs[u][A], pattern.vs[v][B]
-        pattern.vs["A"] = pattern.vs["B"] = pattern.vs["C"] = 0
-        pattern.vs[u][A] = u_A_val
-        pattern.vs[v][B] = v_B_val
-        if A == B:
-            C.remove(A)
-            pattern_dglgraph.ndata[A] = np.array(pattern.vs[A], dtype=np.int64)
-            pattern_dglgraph.ndata[C[0]] = np.array(pattern.vs[C[0]], dtype=np.int64)
-            pattern_dglgraph.ndata[C[1]] = np.array(pattern.vs[C[1]], dtype=np.int64)
-        else:
-            C.remove(A)
-            C.remove(B)
-            pattern_dglgraph.ndata[A] = np.array(pattern.vs[A], dtype=np.int64)
-            pattern_dglgraph.ndata[B] = np.array(pattern.vs[B], dtype=np.int64)
-            pattern_dglgraph.ndata[C[0]] = np.array(pattern.vs[C[0]], dtype=np.int64)
-            
         pattern_dglgraph.ndata["id"] = np.arange(0, pattern.vcount(), dtype=np.int64)
         pattern_dglgraph.edata["label"] = np.array(pattern.es["label"], dtype=np.int64)
 
-        graph = x["graph"]
+        # graph = x["graph"]
+        #for graph, equal ralation like x.A = y.B, need add different vertices corresponding to different attr value
+        added = max(attr_range[attr_name.index(A)], attr_range[attr_name.index(B)]) + 1
+        o_v_count = graph.vcount()
+        graph.add_vertices(added)
+        for i in range(added):
+            graph.vs[o_v_count + i]["label"] = MAX_V_LABEL_VALUE
+        for i in range(graph.vcount):
+            A_value, B_value = graph.vs[i][A], graph.vs[i][B]
+            graph.add_edges([(i, o_v_count + A_value), (i, o_v_count + B_value)])
+            i_2_t1, i_2_t2 = graph.get_eid(i, o_v_count + A_value), graph.get_eid(i, o_v_count + B_value)
+            graph.es[i_2_t1]["label"] = MAX_E_LABEL_VALUE + 1 + attr_name.index(A)
+            graph.es[i_2_t2]["label"] = MAX_E_LABEL_VALUE + 1 + attr_name.index(B)
         graph_dglgraph = GraphAdjDataset.graph2dglgraph(graph)
         graph_dglgraph.ndata["indeg"] = np.array(graph.indegree(), dtype=np.float32)
         graph_dglgraph.ndata["label"] = np.array(graph.vs["label"], dtype=np.int64)
