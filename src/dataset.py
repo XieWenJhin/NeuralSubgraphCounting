@@ -336,12 +336,10 @@ class GraphAdjDataset(data.Dataset):
             i_2_t1, i_2_t2 = graph.get_eid(i, o_v_count + A_value), graph.get_eid(i, o_v_count + B_value)
             graph.es[i_2_t1]["label"] = MAX_E_LABEL_VALUE + 1 + attr_name.index(A)
             graph.es[i_2_t2]["label"] = MAX_E_LABEL_VALUE + 1 + attr_name.index(B)
+
         graph_dglgraph = GraphAdjDataset.graph2dglgraph(graph)
         graph_dglgraph.ndata["indeg"] = np.array(graph.indegree(), dtype=np.float32)
         graph_dglgraph.ndata["label"] = np.array(graph.vs["label"], dtype=np.int64)
-        graph_dglgraph.ndata["A"] = np.array(graph.vs["A"], dtype=np.int64)
-        graph_dglgraph.ndata["B"] = np.array(graph.vs["B"], dtype=np.int64)
-        graph_dglgraph.ndata["C"] = np.array(graph.vs["C"], dtype=np.int64)
         graph_dglgraph.ndata["id"] = np.arange(0, graph.vcount(), dtype=np.int64)
         graph_dglgraph.edata["label"] = np.array(graph.es["label"], dtype=np.int64)
 
