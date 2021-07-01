@@ -330,7 +330,7 @@ class GraphAdjDataset(data.Dataset):
         graph.add_vertices(added)
         for i in range(added):
             graph.vs[o_v_count + i]["label"] = MAX_V_LABEL_VALUE
-        for i in range(graph.vcount):
+        for i in range(o_v_count):
             A_value, B_value = graph.vs[i][A], graph.vs[i][B]
             graph.add_edges([(i, o_v_count + A_value), (i, o_v_count + B_value)])
             i_2_t1, i_2_t2 = graph.get_eid(i, o_v_count + A_value), graph.get_eid(i, o_v_count + B_value)
