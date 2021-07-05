@@ -102,7 +102,7 @@ def read_metadata_from_dir(dirpath, num_workers=4):
 
 
 attr_name = ["A", "B", "C", "D", "E"]
-def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, new_graph_dir, new_metadata_dir, attr_num, attr_range, num_workers=4):
+def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, new_graph_dir, new_metadata_dir, attr_num, attr_range, constants, variables, num_workers=4):
     patterns = read_patterns_from_dir(pattern_dir, num_workers=num_workers)
     graphs = read_graphs_from_dir(graph_dir, num_workers=num_workers)
     meta = read_metadata_from_dir(metadata_dir, num_workers=num_workers)
@@ -127,17 +127,20 @@ def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, n
                 
                 #if has matches, generate literals
                 if meta[p][g]["counts"] != 0:
-                    #chose two vertices of pattern
-                    x = random.randint(0, pattern.vcount() - 1)
-                    y = random.randint(0, pattern.vcount() - 1)
-                    # guarantee x != y
-                    while y == x:
+                    #generator variable literals
+                    constant_literals = list()
+                    for i in range(constants):
+                        #chose two vertices of pattern
+                        x = random.randint(0, pattern.vcount() - 1)
                         y = random.randint(0, pattern.vcount() - 1)
-                    #chose two attributes, allow A == B
-                    A = random.randint(0, attr_num - 1)
-                    B = random.randint(0, attr_num - 1)
-                    #literal is x.A == y.B
-                    pattern.vs[x][attr_name[A]] = pattern.vs[y][attr_name[B]] = random.randint(0, min(attr_range[A], attr_range[B]))
+                        # guarantee x != y
+                        while y == x:
+                            y = random.randint(0, pattern.vcount() - 1)
+                        #chose two attributes, allow A == B
+                        A = random.randint(0, attr_num - 1)
+                        B = random.randint(0, attr_num - 1)
+                        #literal is x.A == y.B
+                        pattern.vs[x][attr_name[A]] = pattern.vs[y][attr_name[B]] = random.randint(0, min(attr_range[A], attr_range[B]))
 
                     #process matchs and compute counts
                     for subisomorphism in meta[p][g]["subisomorphisms"]:
@@ -225,8 +228,10 @@ config = {
     "new_pattern_dir": "../data/test1_attributed_2/patterns",
     "new_graph_dir": "../data/test1_attributed_2/graphs",
     "new_meta_dir": "../data/test1_attributed_2/nmetadata",
-    "attr_num": 3,
-    "attr_range": "3,3,3",
+    "attr_num": 5,
+    "attr_range": "8,8,8,8,8",
+    "constants:" 1,
+    "variables" 2
 }
 
 if __name__ == "__main__":
@@ -248,6 +253,8 @@ if __name__ == "__main__":
             pass
     config["attr_num"] = int(config["attr_num"])
     config["attr_range"] = [int(x) for x in config["attr_range"].split(",")]
+    config["constants"] = int(config["constants"])
+    config["variables"] = int(config["variables"])
     generate_attributes(config["graph_dir"], config["pattern_dir"], config["meta_dir"], 
         config["new_pattern_dir"], config["new_graph_dir"], config["new_meta_dir"],
-        config["attr_num"], config["attr_range"])
+        config["attr_num"], config["attr_range"], config["constants"], config["variables"])

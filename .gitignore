@@ -5,3 +5,4 @@ figs/*
 .ipynb_checkpoints
 __pychache__
 *.pyc
+*.txt
