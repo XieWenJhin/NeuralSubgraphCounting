@@ -139,6 +139,7 @@ def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, n
                         while y == x:
                             y = random.randint(0, pattern.vcount() - 1)
                         #chose two attributes, allow A == B
+                        #Warning: exactly if x, y both changed, A and B can be same as other variable literals
                         A = random.choice(left_attrs)
                         B = random.choice(left_attrs)
                         #each variable literal contain different attributes
@@ -183,9 +184,16 @@ def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, n
                                 x_2_g = subisomorphism[x]
                                 y_2_g = subisomorphism[y]
                                 graph.vs[x_2_g][attr_name[A]] = graph.vs[y_2_g][attr_name[B]] = random.randint(0, min(attr_range[A], attr_range[B]))
+                                #resolve literals confict
+                                for l in constants_literals:
+                                    if (x == l[0] and A == l[1]) or (y == l[0] and B == l[1]):
+                                        graph.vs[x_2_g][attr_name[A]] = graph.vs[y_2_g][attr_name[B]] = c
+                                        break
 
                             for literal in constants_literals:
                                 x, A, c = literal
+                                x_2_g = subisomorphism[x]
+                                graph.vs[x_2_g][attr_name[A]] = c
                             counts += 1
                 #write to new data file
                 os.makedirs(new_pattern_dir, exist_ok=True)
