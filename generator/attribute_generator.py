@@ -128,20 +128,30 @@ def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, n
                 #if has matches, generate literals
                 if meta[p][g]["counts"] != 0:
                     #generator variable literals
-                    constant_literals = list()
-                    for i in range(constants):
-                        #chose two vertices of pattern
-                        x = random.randint(0, pattern.vcount() - 1)
+                    variable_literals = list()
+                    #chose two vertices of pattern
+                    x = random.randint(0, pattern.vcount() - 1)
+                    y = random.randint(0, pattern.vcount() - 1)
+                    # guarantee x != y
+                    while y == x:
                         y = random.randint(0, pattern.vcount() - 1)
-                        # guarantee x != y
-                        while y == x:
-                            y = random.randint(0, pattern.vcount() - 1)
+                    left_attrs = [int(x) for x in range(attr_num)]
+                    for i in range(variables):
                         #chose two attributes, allow A == B
-                        A = random.randint(0, attr_num - 1)
-                        B = random.randint(0, attr_num - 1)
+                        A = random.choice(left_attrs)
+                        B = random.choice(left_attrs)
+                        #each variable literal contain different attributes
+                        left_attrs.remove(A)
+                        left_attrs.remove(B)
+                        variable_literals.append([x, A, y, B])
                         #literal is x.A == y.B
                         pattern.vs[x][attr_name[A]] = pattern.vs[y][attr_name[B]] = random.randint(0, min(attr_range[A], attr_range[B]))
 
+                    #generator constant literals
+                    for i in range(constants):
+                        #chose a vertex of pattern
+                        x = random.randint(0, pattern.vcount() - 1)
+                        A = random.randint
                     #process matchs and compute counts
                     for subisomorphism in meta[p][g]["subisomorphisms"]:
                         x_2_g = subisomorphism[x]
