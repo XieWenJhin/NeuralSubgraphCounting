@@ -130,13 +130,14 @@ def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, n
                     #generator variable literals
                     variable_literals = list()
                     #chose two vertices of pattern
-                    x = random.randint(0, pattern.vcount() - 1)
-                    y = random.randint(0, pattern.vcount() - 1)
-                    # guarantee x != y
-                    while y == x:
-                        y = random.randint(0, pattern.vcount() - 1)
                     left_attrs = [int(x) for x in range(attr_num)]
                     for i in range(variables):
+                        #chose two vertices of pattern
+                        x = random.randint(0, pattern.vcount() - 1)
+                        y = random.randint(0, pattern.vcount() - 1)
+                        # guarantee x != y
+                        while y == x:
+                            y = random.randint(0, pattern.vcount() - 1)
                         #chose two attributes, allow A == B
                         A = random.choice(left_attrs)
                         B = random.choice(left_attrs)
@@ -148,18 +149,43 @@ def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, n
                         pattern.vs[x][attr_name[A]] = pattern.vs[y][attr_name[B]] = random.randint(0, min(attr_range[A], attr_range[B]))
 
                     #generator constant literals
+                    constants_literals = list()
                     for i in range(constants):
                         #chose a vertex of pattern
                         x = random.randint(0, pattern.vcount() - 1)
-                        A = random.randint
+                        A = random.randint(0, attr_num - 1)
+                        c = pattern.vs[x][attr_name[A]]
+                        constants_literals.append([x, A, c])
+
                     #process matchs and compute counts
                     for subisomorphism in meta[p][g]["subisomorphisms"]:
-                        x_2_g = subisomorphism[x]
-                        y_2_g = subisomorphism[y]
-                        if graph.vs[x_2_g][attr_name[A]] == graph.vs[y_2_g][attr_name[B]]:
+                        satisfied = True
+                        #check variable literals
+                        for literal in variable_literals:
+                            x, A, y, B = literal
+                            x_2_g = subisomorphism[x]
+                            y_2_g = subisomorphism[y]
+                            if graph.vs[x_2_g][attr_name[A]] != graph.vs[y_2_g][attr_name[B]]:
+                                satisfied = False
+                                break
+                        #check constant literals
+                        for literal in constants_literals:
+                            x, A, c = literal
+                            if graph.vs[x_2_g][attr_name[A]] != c:
+                                satisfied = False
+                                break
+                        #if match already satisfied literals, add counts;else revise match to satisfied under a probability 
+                        if satisfied:
                             counts += 1
                         elif random.random() > 0.7:
-                            graph.vs[x_2_g][attr_name[A]] = graph.vs[y_2_g][attr_name[B]] = random.randint(0, min(attr_range[A], attr_range[B]))
+                            for literal in variable_literals:
+                                x, A, y, B = literal
+                                x_2_g = subisomorphism[x]
+                                y_2_g = subisomorphism[y]
+                                graph.vs[x_2_g][attr_name[A]] = graph.vs[y_2_g][attr_name[B]] = random.randint(0, min(attr_range[A], attr_range[B]))
+
+                            for literal in constants_literals:
+                                x, A, c = literal
                             counts += 1
                 #write to new data file
                 os.makedirs(new_pattern_dir, exist_ok=True)
