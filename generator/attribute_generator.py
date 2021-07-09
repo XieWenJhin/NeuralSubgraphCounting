@@ -102,7 +102,7 @@ def read_metadata_from_dir(dirpath, num_workers=4):
 
 
 attr_name = ["A", "B", "C", "D", "E"]
-def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, new_graph_dir, new_metadata_dir, attr_num, attr_range, constants, variables, num_workers=4):
+def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, new_graph_dir, new_metadata_dir, attr_num, attr_range, constants, variables, num_workers=32):
     patterns = read_patterns_from_dir(pattern_dir, num_workers=num_workers)
     graphs = read_graphs_from_dir(graph_dir, num_workers=num_workers)
     meta = read_metadata_from_dir(metadata_dir, num_workers=num_workers)
@@ -111,6 +111,7 @@ def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, n
     for p, pattern in patterns.items():
         if p in graphs:
             for g, graph in graphs[p].items():
+                print("process",p,g)
                 #generate attributes for pattern and graph
                 counts = 0
                 for i in range(attr_num):
@@ -125,41 +126,40 @@ def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, n
                         attr.append(random.randint(0,attr_range[i]))
                     graph.vs[attr_name[i]] = attr
                 
-                #if has matches, generate literals
-                if meta[p][g]["counts"] != 0:
-                    #generator variable literals
-                    variable_literals = list()
+                #generator variable literals
+                variable_literals = list()
+                #chose two vertices of pattern
+                left_attrs = [int(x) for x in range(attr_num)]
+                for i in range(variables):
                     #chose two vertices of pattern
-                    left_attrs = [int(x) for x in range(attr_num)]
-                    for i in range(variables):
-                        #chose two vertices of pattern
-                        x = random.randint(0, pattern.vcount() - 1)
+                    x = random.randint(0, pattern.vcount() - 1)
+                    y = random.randint(0, pattern.vcount() - 1)
+                    # guarantee x != y
+                    while y == x:
                         y = random.randint(0, pattern.vcount() - 1)
-                        # guarantee x != y
-                        while y == x:
-                            y = random.randint(0, pattern.vcount() - 1)
-                        #chose two attributes, allow A == B
-                        #Warning: exactly if x, y both changed, A and B can be same as other variable literals
-                        A = random.choice(left_attrs)
-                        B = random.choice(left_attrs)
-                        #each variable literal contain different attributes
-                        left_attrs.remove(A)
-                        if A != B:
-                            left_attrs.remove(B)
-                        variable_literals.append([x, A, y, B])
-                        #literal is x.A == y.B
-                        pattern.vs[x][attr_name[A]] = pattern.vs[y][attr_name[B]] = random.randint(0, min(attr_range[A], attr_range[B]))
+                    #chose two attributes, allow A == B
+                    #Warning: exactly if x, y both changed, A and B can be same as other variable literals
+                    A = random.choice(left_attrs)
+                    B = random.choice(left_attrs)
+                    #each variable literal contain different attributes
+                    left_attrs.remove(A)
+                    if A != B:
+                        left_attrs.remove(B)
+                    variable_literals.append([x, A, y, B])
+                    #literal is x.A == y.B
+                    pattern.vs[x][attr_name[A]] = pattern.vs[y][attr_name[B]] = random.randint(0, min(attr_range[A], attr_range[B]))
 
-                    #generator constant literals
-                    constants_literals = list()
-                    for i in range(constants):
-                        #chose a vertex of pattern
-                        x = random.randint(0, pattern.vcount() - 1)
-                        A = random.randint(0, attr_num - 1)
-                        c = pattern.vs[x][attr_name[A]]
-                        constants_literals.append([x, A, c])
+                #generator constant literals
+                constant_literals = list()
+                for i in range(constants):
+                    #chose a vertex of pattern
+                    x = random.randint(0, pattern.vcount() - 1)
+                    A = random.randint(0, attr_num - 1)
+                    c = pattern.vs[x][attr_name[A]]
+                    constant_literals.append([x, A, c])
 
-                    #process matchs and compute counts
+                #if has match, process matchs and compute counts 
+                if meta[p][g]["counts"] != 0:
                     for subisomorphism in meta[p][g]["subisomorphisms"]:
                         satisfied = True
                         #check variable literals
@@ -171,7 +171,7 @@ def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, n
                                 satisfied = False
                                 break
                         #check constant literals
-                        for literal in constants_literals:
+                        for literal in constant_literals:
                             x, A, c = literal
                             if graph.vs[x_2_g][attr_name[A]] != c:
                                 satisfied = False
@@ -179,19 +179,19 @@ def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, n
                         #if match already satisfied literals, add counts;else revise match to satisfied under a probability 
                         if satisfied:
                             counts += 1
-                        elif random.random() > 0.7:
+                        elif random.random() > 0.5:
                             for literal in variable_literals:
                                 x, A, y, B = literal
                                 x_2_g = subisomorphism[x]
                                 y_2_g = subisomorphism[y]
                                 graph.vs[x_2_g][attr_name[A]] = graph.vs[y_2_g][attr_name[B]] = random.randint(0, min(attr_range[A], attr_range[B]))
                                 #resolve literals confict
-                                for l in constants_literals:
+                                for l in constant_literals:
                                     if (x == l[0] and A == l[1]) or (y == l[0] and B == l[1]):
                                         graph.vs[x_2_g][attr_name[A]] = graph.vs[y_2_g][attr_name[B]] = c
                                         break
 
-                            for literal in constants_literals:
+                            for literal in constant_literals:
                                 x, A, c = literal
                                 x_2_g = subisomorphism[x]
                                 graph.vs[x_2_g][attr_name[A]] = c
@@ -208,12 +208,12 @@ def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, n
                     json.dump({"counts": counts, "subisomorphisms": meta[p][g]["subisomorphisms"]}, f)
                 
                 with open(os.path.join(new_pattern_dir, p + ".literals"), "w") as f:
-                    json.dump({"constant literals": constants_literals, "variable literals": variable_literals} , f)
+                    json.dump({"constant literals": constant_literals, "variable literals": variable_literals} , f)
 
 
         elif len(graphs) == 1 and "raw" in graphs.keys():
             for g, graph in graphs["raw"].items():
-                                #generate attributes for pattern and graph
+                #generate attributes for pattern and graph
                 counts = 0
                 for i in range(attr_num):
                     attr = list()
@@ -227,40 +227,40 @@ def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, n
                         attr.append(random.randint(0,attr_range[i]))
                     graph.vs[attr_name[i]] = attr
                 
-                #if has matches, generate literals
-                if meta[p][g]["counts"] != 0:
-                    #generator variable literals
-                    variable_literals = list()
+                #generator variable literals
+                variable_literals = list()
+                #chose two vertices of pattern
+                left_attrs = [int(x) for x in range(attr_num)]
+                for i in range(variables):
                     #chose two vertices of pattern
-                    left_attrs = [int(x) for x in range(attr_num)]
-                    for i in range(variables):
-                        #chose two vertices of pattern
-                        x = random.randint(0, pattern.vcount() - 1)
+                    x = random.randint(0, pattern.vcount() - 1)
+                    y = random.randint(0, pattern.vcount() - 1)
+                    # guarantee x != y
+                    while y == x:
                         y = random.randint(0, pattern.vcount() - 1)
-                        # guarantee x != y
-                        while y == x:
-                            y = random.randint(0, pattern.vcount() - 1)
-                        #chose two attributes, allow A == B
-                        #Warning: exactly if x, y both changed, A and B can be same as other variable literals
-                        A = random.choice(left_attrs)
-                        B = random.choice(left_attrs)
-                        #each variable literal contain different attributes
-                        left_attrs.remove(A)
+                    #chose two attributes, allow A == B
+                    #Warning: exactly if x, y both changed, A and B can be same as other variable literals
+                    A = random.choice(left_attrs)
+                    B = random.choice(left_attrs)
+                    #each variable literal contain different attributes
+                    left_attrs.remove(A)
+                    if A != B:
                         left_attrs.remove(B)
-                        variable_literals.append([x, A, y, B])
-                        #literal is x.A == y.B
-                        pattern.vs[x][attr_name[A]] = pattern.vs[y][attr_name[B]] = random.randint(0, min(attr_range[A], attr_range[B]))
+                    variable_literals.append([x, A, y, B])
+                    #literal is x.A == y.B
+                    pattern.vs[x][attr_name[A]] = pattern.vs[y][attr_name[B]] = random.randint(0, min(attr_range[A], attr_range[B]))
 
-                    #generator constant literals
-                    constants_literals = list()
-                    for i in range(constants):
-                        #chose a vertex of pattern
-                        x = random.randint(0, pattern.vcount() - 1)
-                        A = random.randint(0, attr_num - 1)
-                        c = pattern.vs[x][attr_name[A]]
-                        constants_literals.append([x, A, c])
-
-                    #process matchs and compute counts
+                #generator constant literals
+                constant_literals = list()
+                for i in range(constants):
+                    #chose a vertex of pattern
+                    x = random.randint(0, pattern.vcount() - 1)
+                    A = random.randint(0, attr_num - 1)
+                    c = pattern.vs[x][attr_name[A]]
+                    constant_literals.append([x, A, c])
+                    
+                #if has match, process matchs and compute counts 
+                if meta[p][g]["counts"] != 0:
                     for subisomorphism in meta[p][g]["subisomorphisms"]:
                         satisfied = True
                         #check variable literals
@@ -272,7 +272,7 @@ def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, n
                                 satisfied = False
                                 break
                         #check constant literals
-                        for literal in constants_literals:
+                        for literal in constant_literals:
                             x, A, c = literal
                             if graph.vs[x_2_g][attr_name[A]] != c:
                                 satisfied = False
@@ -287,12 +287,12 @@ def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, n
                                 y_2_g = subisomorphism[y]
                                 graph.vs[x_2_g][attr_name[A]] = graph.vs[y_2_g][attr_name[B]] = random.randint(0, min(attr_range[A], attr_range[B]))
                                 #resolve literals confict
-                                for l in constants_literals:
+                                for l in constant_literals:
                                     if (x == l[0] and A == l[1]) or (y == l[0] and B == l[1]):
                                         graph.vs[x_2_g][attr_name[A]] = graph.vs[y_2_g][attr_name[B]] = c
                                         break
 
-                            for literal in constants_literals:
+                            for literal in constant_literals:
                                 x, A, c = literal
                                 x_2_g = subisomorphism[x]
                                 graph.vs[x_2_g][attr_name[A]] = c
@@ -309,17 +309,17 @@ def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, n
                     json.dump({"counts": counts, "subisomorphisms": meta[p][g]["subisomorphisms"]}, f)
                 
                 with open(os.path.join(new_pattern_dir, p + ".literals"), "w") as f:
-                    json.dump({"constant literals": constants_literals, "variable literals": variable_literals} , f)
+                    json.dump({"constant literals": constant_literals, "variable literals": variable_literals} , f)
     
 
 
 config = {
-    "pattern_dir": "../data/test1/patterns",
-    "graph_dir": "../data/test1/graphs",
-    "meta_dir": "../data/test1/metadata",
-    "new_pattern_dir": "../data/test1_attributed/patterns",
-    "new_graph_dir": "../data/test1_attributed/graphs",
-    "new_meta_dir": "../data/test1_attributed/metadata",
+    "pattern_dir": "../data/small/patterns",
+    "graph_dir": "../data/small/graphs",
+    "meta_dir": "../data/small/metadata",
+    "new_pattern_dir": "../data/small_multi/patterns",
+    "new_graph_dir": "../data/small_multi/graphs",
+    "new_meta_dir": "../data/small_multi/metadata",
     "attr_num": 5,
     "attr_range": "8,8,8,8,8",
     "constants": 1,

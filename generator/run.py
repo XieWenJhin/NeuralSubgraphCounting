@@ -63,7 +63,7 @@ SMALL_CONFIG = {
 LARGE_CONFIG = {
     "max_subgraph": 512,
 
-    "alphas": [0.2, 0.25, 0.3],
+    "alphas": [0.15, 0.2, 0.25],
     
     "number_of_patterns": 2,
     "number_of_pattern_vertices": [3, 4, 8, 16],
@@ -78,10 +78,10 @@ LARGE_CONFIG = {
     "number_of_graph_edge_labels": [16, 32, 64],
 
     "max_ratio_of_edges_vertices": 4,
-    "max_pattern_counts": 16384,
+    "max_pattern_counts": 4096,
 
     "save_data_dir": r"../data/large",
-    "num_workers": 16
+    "num_workers": 32
 }
 
 CONFIG = LARGE_CONFIG
