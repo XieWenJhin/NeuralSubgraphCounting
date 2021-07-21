@@ -406,6 +406,8 @@ def _read_graphs_from_dir(dirpath):
                 graph.vs["A"] = [int(x) for x in graph.vs["A"]]
                 graph.vs["B"] = [int(x) for x in graph.vs["B"]]
                 graph.vs["C"] = [int(x) for x in graph.vs["C"]]
+                graph.vs["D"] = [int(x) for x in graph.vs["D"]]
+                graph.vs["E"] = [int(x) for x in graph.vs["E"]]
                 graph.es["label"] = [int(x) for x in graph.es["label"]]
                 graph.es["key"] = [int(x) for x in graph.es["key"]]
                 graphs[names[0]] = graph
@@ -475,7 +477,7 @@ def _read_literals_from_dir(dirpath):
     for filename in os.listdir(dirpath):
         if not os.path.isdir(os.path.join(dirpath, filename)):
             names = os.path.splitext(os.path.basename(filename))
-            if names[1] != ".literal":
+            if names[1] != ".literals":
                 continue
             try:
                 with open(os.path.join(dirpath, filename), "r") as f:
@@ -515,7 +517,7 @@ def load_data(graph_dir, pattern_dir, metadata_dir, num_workers=4):
                 x["graph"] = graph
                 x["subisomorphisms"] = meta[p][g]["subisomorphisms"]
                 x["counts"] = meta[p][g]["counts"]
-                x["literals"] = literals[p]["literals"]
+                x["literals"] = literals[p]
 
                 g_idx = int(g.rsplit("_", 1)[-1])
                 if g_idx % 10 == 0:

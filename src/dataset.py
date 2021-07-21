@@ -297,6 +297,7 @@ class GraphAdjDataset(data.Dataset):
         
         #extend pattern with variable literals
         variable_literals = x["literals"]["variable literals"]
+        constant_literals = x["literals"]["constant literals"]
         for variable_literal in variable_literals:
             u, A, v, B = variable_literal
             u, A, v, B = int(u), int(A), int(v), int(B)
@@ -352,10 +353,10 @@ class GraphAdjDataset(data.Dataset):
                 graph.es[i_2_t2]["label"] = MAX_E_LABEL_VALUE + 1 + B
             #extend graph with constant literals
             for constant_literal in constant_literals:
-                u, A, c = variable_literal
+                u, A, c = constant_literal
                 u, A, c = int(u), int(A), int(c)
                 A_value = graph.vs[i][attr_name[A]]
-                graph.add_edges([i, o_v_count + add_v_count + A_value])
+                graph.add_edges([(i, o_v_count + add_v_count + A_value)])
                 i_2_t = graph.get_eid(i, o_v_count + add_v_count + A_value)
                 graph.es[i_2_t]["label"] = MAX_E_LABEL_VALUE + 1 + A
                 
