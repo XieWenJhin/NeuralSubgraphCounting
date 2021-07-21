@@ -138,7 +138,7 @@ def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, n
                     while y == x:
                         y = random.randint(0, pattern.vcount() - 1)
                     #chose two attributes, allow A == B
-                    #Warning: exactly if x, y both changed, A and B can be same as other variable literals
+                    #Warning: exactly if x or y changed, A and B can be same as other variable literals
                     A = random.choice(left_attrs)
                     B = random.choice(left_attrs)
                     #each variable literal contain different attributes
@@ -153,6 +153,7 @@ def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, n
                 constant_literals = list()
                 for i in range(constants):
                     #chose a vertex of pattern
+                    #Warning:attr shoude be different for each constant literal
                     x = random.randint(0, pattern.vcount() - 1)
                     A = random.randint(0, attr_num - 1)
                     c = pattern.vs[x][attr_name[A]]

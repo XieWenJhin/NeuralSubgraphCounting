@@ -43,7 +43,7 @@ train_config = {
     "base": 2,
 
     "gpu_id": -1,
-    "num_workers": 12,
+    "num_workers": 24,
     
     "epochs": 100,
     "batch_size": 512,
@@ -436,7 +436,6 @@ if __name__ == "__main__":
             logger.info("data (data_type: {:<5s}, len: {}) generated".format(data_type, len(dataset.data)))
             logger.info("data_loader (data_type: {:<5s}, len: {}, batch_size: {}) generated".format(data_type, len(data_loader), train_config["batch_size"]))
 
-    logger.info("end data load")
     # optimizer and losses
     writer = SummaryWriter(save_model_dir)
     optimizer = torch.optim.AdamW(model.parameters(), lr=train_config["lr"], weight_decay=train_config["weight_decay"], amsgrad=True)

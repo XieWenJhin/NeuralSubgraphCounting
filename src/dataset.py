@@ -286,9 +286,9 @@ class GraphAdjDataset(data.Dataset):
 
     @staticmethod
     def preprocess(x):
-        pattern = x["pattern"]
-        graph = x["graph"]
-        
+        pattern = copy.copy(x["pattern"])
+        graph = copy.copy(x["graph"])
+        print(x["pattern"].vcount())
         attr_name  = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
         attr_range = [8, 8, 8, 8, 8, 8, 8]
         
@@ -302,7 +302,7 @@ class GraphAdjDataset(data.Dataset):
             u, A, v, B = variable_literal
             u, A, v, B = int(u), int(A), int(v), int(B)
             #target vertex: vlabel = MAX_V_LABEL_VALUE + 1, elabel = MAX_E_LABEL_VALUE + 1 + attribute_index
-        
+            
             o_v_count = pattern.vcount()
             pattern.add_vertices(1)
             tid = o_v_count
@@ -341,20 +341,23 @@ class GraphAdjDataset(data.Dataset):
         graph.add_vertices(add_v_count)
         for i in range(add_v_count):
             graph.vs[o_v_count + add_v_count + i]["label"] = MAX_V_LABEL_VALUE + 2 + i
-        for i in range(o_v_count):
+        for i in tqdm(range(o_v_count)):
             #extend graph with variable literals
+            v_l_attrs = []
             for variable_literal in variable_literals:
                 u, A, v, B = variable_literal
                 A, B = int(A), int(B)
-                A_value, B_value = graph.vs[i][attr_name[A]], graph.vs[i][attr_name[B]]
-                graph.add_edges([(i, o_v_count + A_value), (i, o_v_count + B_value)])
-                i_2_t1, i_2_t2 = graph.get_eid(i, o_v_count + A_value), graph.get_eid(i, o_v_count + B_value)
-                graph.es[i_2_t1]["label"] = MAX_E_LABEL_VALUE + 1 + A
-                graph.es[i_2_t2]["label"] = MAX_E_LABEL_VALUE + 1 + B
+                v_l_attrs.extend([A, B])
+            v_l_attrs = set(v_l_attrs)
+            for A in v_l_attrs:
+                A_value = graph.vs[i][attr_name[A]]
+                graph.add_edge(i, o_v_count + A_value)
+                i_2_t = graph.get_eid(i, o_v_count + A_value)
+                graph.es[i_2_t]["label"] = MAX_E_LABEL_VALUE + 1 + A
             #extend graph with constant literals
             for constant_literal in constant_literals:
                 u, A, c = constant_literal
-                u, A, c = int(u), int(A), int(c)
+                A = int(A)
                 A_value = graph.vs[i][attr_name[A]]
                 graph.add_edges([(i, o_v_count + add_v_count + A_value)])
                 i_2_t = graph.get_eid(i, o_v_count + add_v_count + A_value)
@@ -365,9 +368,11 @@ class GraphAdjDataset(data.Dataset):
         graph_dglgraph.ndata["label"] = np.array(graph.vs["label"], dtype=np.int64)
         graph_dglgraph.ndata["id"] = np.arange(0, graph.vcount(), dtype=np.int64)
         graph_dglgraph.edata["label"] = np.array(graph.es["label"], dtype=np.int64)
-
-        subisomorphisms = np.array(x["subisomorphisms"], dtype=np.int32).reshape(-1, x["pattern"].vcount())
-
+        try:
+            subisomorphisms = np.array(x["subisomorphisms"], dtype=np.int32).reshape(-1, x["pattern"].vcount())
+        except ValueError:
+            print(x["id"])
+            print(x["subisomorphisms"])
         x = {
             "id": x["id"],
             "pattern": pattern_dglgraph,
