@@ -288,7 +288,6 @@ class GraphAdjDataset(data.Dataset):
     def preprocess(x):
         pattern = copy.copy(x["pattern"])
         graph = copy.copy(x["graph"])
-        print(x["pattern"].vcount())
         attr_name  = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
         attr_range = [8, 8, 8, 8, 8, 8, 8]
         
@@ -341,7 +340,7 @@ class GraphAdjDataset(data.Dataset):
         graph.add_vertices(add_v_count)
         for i in range(add_v_count):
             graph.vs[o_v_count + add_v_count + i]["label"] = MAX_V_LABEL_VALUE + 2 + i
-        for i in tqdm(range(o_v_count)):
+        for i in range(o_v_count):
             #extend graph with variable literals
             v_l_attrs = []
             for variable_literal in variable_literals:
@@ -368,11 +367,8 @@ class GraphAdjDataset(data.Dataset):
         graph_dglgraph.ndata["label"] = np.array(graph.vs["label"], dtype=np.int64)
         graph_dglgraph.ndata["id"] = np.arange(0, graph.vcount(), dtype=np.int64)
         graph_dglgraph.edata["label"] = np.array(graph.es["label"], dtype=np.int64)
-        try:
-            subisomorphisms = np.array(x["subisomorphisms"], dtype=np.int32).reshape(-1, x["pattern"].vcount())
-        except ValueError:
-            print(x["id"])
-            print(x["subisomorphisms"])
+        subisomorphisms = np.array(x["subisomorphisms"], dtype=np.int32).reshape(-1, x["pattern"].vcount())
+
         x = {
             "id": x["id"],
             "pattern": pattern_dglgraph,
