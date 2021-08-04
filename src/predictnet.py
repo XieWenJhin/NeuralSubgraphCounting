@@ -482,7 +482,7 @@ class BasePoolPredictNet(nn.Module):
         self.g_layer = nn.Linear(graph_dim, hidden_dim)
 
         self.pred_layer1 = nn.Linear(self.hidden_dim*4+4, self.hidden_dim)
-        self.pred_layer2 = nn.Linear(self.hidden_dim+4, 1)
+        self.pred_layer2 = nn.Linear(self.hidden_dim+4, 2)
 
         # init
         for layer in [self.p_layer, self.g_layer, self.pred_layer1]:
@@ -548,6 +548,7 @@ class SumPredictNet(BasePoolPredictNet):
         g = torch.sum(g, dim=1)
         y = self.pred_layer1(torch.cat([p, g, g-p, g*p, plf, glf, inv_plf, inv_glf], dim=1))
         y = self.act(y)
+        #regress to classfication
         y = self.pred_layer2(torch.cat([y, plf, glf, inv_plf, inv_glf], dim=1))
 
         return y

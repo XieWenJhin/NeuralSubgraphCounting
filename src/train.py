@@ -43,7 +43,7 @@ train_config = {
     "base": 2,
 
     "gpu_id": -1,
-    "num_workers": 12,
+    "num_workers": 48,
     
     "epochs": 100,
     "batch_size": 512,
@@ -76,6 +76,7 @@ train_config = {
                                     # DIAMNet
     "predict_net_add_enc": True,
     "predict_net_add_degree": True,
+    "predict_net_fix_vertices": True,
     "predict_net_hidden_dim": 128,
     "predict_net_num_heads": 4,
     "predict_net_mem_len": 4,
@@ -144,6 +145,8 @@ def train(model, optimizer, scheduler, data_type, data_loader, device, config, e
         reg_crit = lambda pred, target: F.mse_loss(F.relu(pred), target)
     elif config["reg_loss"] == "SMSE":
         reg_crit = lambda pred, target: F.smooth_l1_loss(F.relu(pred), target)
+    elif config["reg_loss"] == "CE":
+        reg_crit = lambda pred, target: F.binary_cross_entropy_with_logits(pred, target)
     else:
         raise NotImplementedError
 
@@ -153,6 +156,8 @@ def train(model, optimizer, scheduler, data_type, data_loader, device, config, e
         bp_crit = lambda pred, target, neg_slp: F.mse_loss(F.leaky_relu(pred, neg_slp), target)
     elif config["bp_loss"] == "SMSE":
         bp_crit = lambda pred, target, neg_slp: F.smooth_l1_loss(F.leaky_relu(pred, neg_slp), target)
+    elif config["reg_loss"] == "CE":
+        bp_crit = lambda pred, target, neg_slp: F.binary_cross_entropy_with_logits(pred, target)
     else:
         raise NotImplementedError
 
@@ -169,14 +174,20 @@ def train(model, optimizer, scheduler, data_type, data_loader, device, config, e
 
         pred = model(pattern, pattern_len, graph, graph_len)
 
-        reg_loss = reg_crit(pred, counts)
+        #add a dim for cross entropy loss
+        d = torch.ones(counts.numel()).reshape(counts.shape)
+        d = d.to(device)
+        d = d - counts
+        label = torch.cat([d,counts],dim = 1)
+
+        reg_loss = reg_crit(pred, label)
         
         if isinstance(config["bp_loss_slp"], (int, float)):
             neg_slp = float(config["bp_loss_slp"])
         else:
             bp_loss_slp, l0, l1 = config["bp_loss_slp"].rsplit("$", 3)
             neg_slp = anneal_fn(bp_loss_slp, batch_id+epoch*epoch_step, T=total_step//4, lambda0=float(l0), lambda1=float(l1))
-        bp_loss = bp_crit(pred, counts, neg_slp)
+        bp_loss = bp_crit(pred, label, neg_slp)
 
         reg_loss_item = reg_loss.item()
         bp_loss_item = bp_loss.item()
@@ -188,10 +199,10 @@ def train(model, optimizer, scheduler, data_type, data_loader, device, config, e
             writer.add_scalar("%s/BP-%s" % (data_type, config["bp_loss"]), bp_loss_item, epoch*epoch_step+batch_id)
 
         if logger and (batch_id % config["print_every"] == 0 or batch_id == epoch_step-1):
-            logger.info("epoch: {:0>3d}/{:0>3d}\tdata_type: {:<5s}\tbatch: {:0>5d}/{:0>5d}\treg loss: {:0>10.3f}\tbp loss: {:0>16.3f}\tground: {:.3f}\tpredict: {:.3f}".format(
+            logger.info("epoch: {:0>3d}/{:0>3d}\tdata_type: {:<5s}\tbatch: {:0>5d}/{:0>5d}\treg loss: {:0>10.3f}\tbp loss: {:0>16.3f}\tground: {:.3f}\tpredict_0: {:.3f}\tpredict_1: {:.3f}".format(
                 epoch, config["epochs"], data_type, batch_id, epoch_step,
                 reg_loss_item, bp_loss_item,
-                counts[0].item(), pred[0].item()))
+                counts[0].item(),pred[0][0].item(), pred[0][1].item()))
 
         bp_loss.backward()
         if (config["update_every"] < 2 or batch_id % config["update_every"] == 0 or batch_id == epoch_step-1):
@@ -215,8 +226,8 @@ def train(model, optimizer, scheduler, data_type, data_loader, device, config, e
     return mean_reg_loss, mean_bp_loss
 
 def evaluate(model, data_type, data_loader, device, config, epoch, logger=None, writer=None):
-    epoch_step = len(data_loader)
-    total_step = config["epochs"] * epoch_step
+    epoch_step = len(data_loader) #iteration
+    total_step = config["epochs"] * epoch_step #itotal iteration
     total_reg_loss = 0
     total_bp_loss = 0
     total_cnt = 1e-6
@@ -231,6 +242,8 @@ def evaluate(model, data_type, data_loader, device, config, epoch, logger=None, 
         reg_crit = lambda pred, target: F.mse_loss(F.relu(pred), target, reduce="none")
     elif config["reg_loss"] == "SMSE":
         reg_crit = lambda pred, target: F.smooth_l1_loss(F.relu(pred), target, reduce="none")
+    elif config["reg_loss"] == "CE": #Cross Entropy 
+        reg_crit = lambda pred, target: F.binary_cross_entropy_with_logits(pred, target)
     else:
         raise NotImplementedError
 
@@ -240,6 +253,8 @@ def evaluate(model, data_type, data_loader, device, config, epoch, logger=None, 
         bp_crit = lambda pred, target, neg_slp: F.mse_loss(F.leaky_relu(pred, neg_slp), target, reduce="none")
     elif config["bp_loss"] == "SMSE":
         bp_crit = lambda pred, target, neg_slp: F.smooth_l1_loss(F.leaky_relu(pred, neg_slp), target, reduce="none")
+    elif config["reg_loss"] == "CE":
+        bp_crit = lambda pred, target, neg_slp: F.binary_cross_entropy_with_logits(pred, target)
     else:
         raise NotImplementedError
 
@@ -248,7 +263,7 @@ def evaluate(model, data_type, data_loader, device, config, epoch, logger=None, 
     with torch.no_grad():
         for batch_id, batch in enumerate(data_loader):
             ids, pattern, pattern_len, graph, graph_len, counts = batch
-            cnt = counts.shape[0]
+            cnt = counts.shape[0] #cnt meansing what??batch size?
             total_cnt += cnt
 
             evaluate_results["data"]["id"].extend(ids)
@@ -266,32 +281,38 @@ def evaluate(model, data_type, data_loader, device, config, epoch, logger=None, 
             evaluate_results["time"]["avg"].extend([avg_t]*cnt)
             evaluate_results["data"]["pred"].extend(pred.cpu().view(-1).tolist())
 
-            reg_loss = reg_crit(pred, counts)
+            #add a dim for cross entropy loss
+            d = torch.ones(counts.numel()).reshape(counts.shape)
+            d = d.to(device)
+            d = d - counts
+            label = torch.cat([d,counts],dim = 1)
+
+            reg_loss = reg_crit(pred, label)
             
             if isinstance(config["bp_loss_slp"], (int, float)):
                 neg_slp = float(config["bp_loss_slp"])
             else:
                 bp_loss_slp, l0, l1 = config["bp_loss_slp"].rsplit("$", 3)
                 neg_slp = anneal_fn(bp_loss_slp, batch_id+epoch*epoch_step, T=total_step//4, lambda0=float(l0), lambda1=float(l1))
-            bp_loss = bp_crit(pred, counts, neg_slp)
+            bp_loss = bp_crit(pred, label, neg_slp)
             
             reg_loss_item = reg_loss.mean().item()
             bp_loss_item = bp_loss.mean().item()
             total_reg_loss += reg_loss_item * cnt
             total_bp_loss += bp_loss_item * cnt
             
-            evaluate_results["error"]["mae"] += F.l1_loss(F.relu(pred), counts, reduce="none").sum().item()
-            evaluate_results["error"]["mse"] += F.mse_loss(F.relu(pred), counts, reduce="none").sum().item()
+            #evaluate_results["error"]["mae"] += F.l1_loss(F.relu(pred), counts, reduce="none").sum().item()
+            #evaluate_results["error"]["mse"] += F.mse_loss(F.relu(pred), counts, reduce="none").sum().item()
 
             if writer:
                 writer.add_scalar("%s/REG-%s" % (data_type, config["reg_loss"]), reg_loss_item, epoch*epoch_step+batch_id)
                 writer.add_scalar("%s/BP-%s" % (data_type, config["bp_loss"]), bp_loss_item, epoch*epoch_step+batch_id)
 
             if logger and batch_id == epoch_step-1:
-                logger.info("epoch: {:0>3d}/{:0>3d}\tdata_type: {:<5s}\tbatch: {:0>5d}/{:0>5d}\treg loss: {:0>10.3f}\tbp loss: {:0>16.3f}\tground: {:.3f}\tpredict: {:.3f}".format(
+                logger.info("epoch: {:0>3d}/{:0>3d}\tdata_type: {:<5s}\tbatch: {:0>5d}/{:0>5d}\treg loss: {:0>10.3f}\tbp loss: {:0>16.3f}\tground: {:.3f}\tpredict_0: {:.3f}\tpredict_1: {:.3f}".format(
                     epoch, config["epochs"], data_type, batch_id, epoch_step,
                     reg_loss_item, bp_loss_item,
-                    counts[0].item(), pred[0].item()))
+                    counts[0].item(), pred[0][0].item(), pred[0][1].item()))
         mean_reg_loss = total_reg_loss/total_cnt
         mean_bp_loss = total_bp_loss/total_cnt
         if writer:
@@ -301,8 +322,8 @@ def evaluate(model, data_type, data_loader, device, config, epoch, logger=None, 
             logger.info("epoch: {:0>3d}/{:0>3d}\tdata_type: {:<5s}\treg loss: {:0>10.3f}\tbp loss: {:0>16.3f}".format(
                 epoch, config["epochs"], data_type, mean_reg_loss, mean_bp_loss))
 
-        evaluate_results["error"]["mae"] = evaluate_results["error"]["mae"] / total_cnt
-        evaluate_results["error"]["mse"] = evaluate_results["error"]["mse"] / total_cnt
+        #evaluate_results["error"]["mae"] = evaluate_results["error"]["mae"] / total_cnt
+        #evaluate_results["error"]["mse"] = evaluate_results["error"]["mse"] / total_cnt
 
     gc.collect()
     return mean_reg_loss, mean_bp_loss, evaluate_results
@@ -311,7 +332,6 @@ def evaluate(model, data_type, data_loader, device, config, epoch, logger=None, 
 if __name__ == "__main__":
     torch.manual_seed(0)
     np.random.seed(0)
-
     for i in range(1, len(sys.argv), 2):
         arg = sys.argv[i]
         value = sys.argv[i+1]
@@ -452,11 +472,11 @@ if __name__ == "__main__":
 
             if data_type == "train":
                 mean_reg_loss, mean_bp_loss = train(model, optimizer, scheduler, data_type, data_loader, device,
-                    train_config, epoch, logger=logger, writer=writer)
+                    train_config, epoch, logger=logger)
                 torch.save(model.state_dict(), os.path.join(save_model_dir, 'epoch%d.pt' % (epoch)))
             else:
                 mean_reg_loss, mean_bp_loss, evaluate_results = evaluate(model, data_type, data_loader, device,
-                    train_config, epoch, logger=logger, writer=writer)
+                    train_config, epoch, logger=logger)
                 with open(os.path.join(save_model_dir, '%s%d.json' % (data_type, epoch)), "w") as f:
                     json.dump(evaluate_results, f)
             if mean_reg_loss <= best_reg_losses[data_type]:

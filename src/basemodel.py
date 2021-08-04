@@ -362,7 +362,8 @@ class GraphAdjModel(BaseModel):
         super(GraphAdjModel, self).__init__(config)
         
         self.add_degree = config["predict_net_add_degree"]
-
+        self.fix_vertices = config["predict_net_fix_vertices"]
+        
         # create encoding layer
         self.g_v_enc, self.g_vl_enc = \
             [self.create_enc(max_n, self.base) for max_n in [self.max_ngv, self.max_ngvl]]

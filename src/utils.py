@@ -482,6 +482,7 @@ def load_data(graph_dir, pattern_dir, metadata_dir, num_workers=4):
                 x["graph"] = graph
                 x["subisomorphisms"] = meta[p][g]["subisomorphisms"]
                 x["counts"] = meta[p][g]["counts"]
+                x["mapping"] = meta[p][g]["mapping"]
 
                 g_idx = int(g.rsplit("_", 1)[-1])
                 if g_idx % 10 == 0:
@@ -498,6 +499,7 @@ def load_data(graph_dir, pattern_dir, metadata_dir, num_workers=4):
                 x["graph"] = graph
                 x["subisomorphisms"] = meta[p][g]["subisomorphisms"]
                 x["counts"] = meta[p][g]["counts"]
+                x["mapping"] = meta[p][g]["mapping"]
 
                 g_idx = int(g.rsplit("_", 1)[-1])
                 if g_idx % 3 == 0:
