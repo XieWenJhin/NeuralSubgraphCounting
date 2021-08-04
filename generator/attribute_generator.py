@@ -159,7 +159,8 @@ def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, n
                     c = pattern.vs[x][attr_name[A]]
                     constant_literals.append([x, A, c])
 
-                #if has match, process matchs and compute counts 
+                #if has match, process matchs and compute counts
+                satisfied_isos = list() 
                 if meta[p][g]["counts"] != 0:
                     for subisomorphism in meta[p][g]["subisomorphisms"]:
                         satisfied = True
@@ -180,6 +181,7 @@ def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, n
                         #if match already satisfied literals, add counts;else revise match to satisfied under a probability 
                         if satisfied:
                             counts += 1
+                            satisfied_isos.append(subisomorphism)
                         elif random.random() > 0.5:
                             for literal in variable_literals:
                                 x, A, y, B = literal
@@ -197,6 +199,7 @@ def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, n
                                 x_2_g = subisomorphism[x]
                                 graph.vs[x_2_g][attr_name[A]] = c
                             counts += 1
+                            satisfied_isos.append(subisomorphism)
                 #write to new data file
                 os.makedirs(new_pattern_dir, exist_ok=True)
                 os.makedirs(os.path.join(new_graph_dir, p), exist_ok=True)
@@ -206,7 +209,7 @@ def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, n
                 graph.write(os.path.join(new_graph_dir, p ,g + ".gml"))
                 
                 with open(os.path.join(new_metadata_dir,p ,g + ".meta"), "w") as f:
-                    json.dump({"counts": counts, "subisomorphisms": meta[p][g]["subisomorphisms"]}, f)
+                    json.dump({"counts": counts, "subisomorphisms": satisfied_isos}, f)
                 
                 with open(os.path.join(new_pattern_dir, p + ".literals"), "w") as f:
                     json.dump({"constant literals": constant_literals, "variable literals": variable_literals} , f)
@@ -261,6 +264,7 @@ def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, n
                     constant_literals.append([x, A, c])
                     
                 #if has match, process matchs and compute counts 
+                satisfied_isos = list()
                 if meta[p][g]["counts"] != 0:
                     for subisomorphism in meta[p][g]["subisomorphisms"]:
                         satisfied = True
@@ -281,6 +285,7 @@ def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, n
                         #if match already satisfied literals, add counts;else revise match to satisfied under a probability 
                         if satisfied:
                             counts += 1
+                            satisfied_isos.append(subisomorphism)
                         elif random.random() > 0.7:
                             for literal in variable_literals:
                                 x, A, y, B = literal
@@ -298,6 +303,7 @@ def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, n
                                 x_2_g = subisomorphism[x]
                                 graph.vs[x_2_g][attr_name[A]] = c
                             counts += 1
+                            satisfied_isos.append(subisomorphism)
                 #write to new data file
                 os.makedirs(new_pattern_dir, exist_ok=True)
                 os.makedirs(os.path.join(new_graph_dir, p), exist_ok=True)
@@ -307,7 +313,7 @@ def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, n
                 graph.write(os.path.join(new_graph_dir, p ,g + ".gml"))
                 
                 with open(os.path.join(new_metadata_dir,p ,g + ".meta"), "w") as f:
-                    json.dump({"counts": counts, "subisomorphisms": meta[p][g]["subisomorphisms"]}, f)
+                    json.dump({"counts": counts, "subisomorphisms": satisfied_isos}, f)
                 
                 with open(os.path.join(new_pattern_dir, p + ".literals"), "w") as f:
                     json.dump({"constant literals": constant_literals, "variable literals": variable_literals} , f)
@@ -318,9 +324,9 @@ config = {
     "pattern_dir": "../data/small/patterns",
     "graph_dir": "../data/small/graphs",
     "meta_dir": "../data/small/metadata",
-    "new_pattern_dir": "../data/small_multi/patterns",
-    "new_graph_dir": "../data/small_multi/graphs",
-    "new_meta_dir": "../data/small_multi/metadata",
+    "new_pattern_dir": "../data/small_multi_fixed/patterns",
+    "new_graph_dir": "../data/small_multi_fixed/graphs",
+    "new_meta_dir": "../data/small_multi_fixed/metadata",
     "attr_num": 5,
     "attr_range": "8,8,8,8,8",
     "constants": 1,
