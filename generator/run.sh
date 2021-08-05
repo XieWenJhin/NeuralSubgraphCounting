@@ -1,0 +1,1 @@
+nohup srun --gres=gpu:1 python -u attribute_generator.py > log_stage1.txt 2>&1 &
