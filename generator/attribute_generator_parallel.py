@@ -216,7 +216,7 @@ def mono_generate(pattern, graph, subisomorphisms, mapping):
         counts = 1
     return graph, counts, subisomorphisms
     
-def process(p, g, pattern, meta, graph, attr_num, attr_range, constants, variables):
+def process(p, g, new_pattern_dir, new_graph_dir, new_metadata_dir, pattern, graph, meta, attr_num, attr_range, constants, variables):
      #generate attributes for pattern and graph
     counts = 0
     for i in range(attr_num):
@@ -323,7 +323,7 @@ def process(p, g, pattern, meta, graph, attr_num, attr_range, constants, variabl
     
     with open(os.path.join(new_pattern_dir, p + ".literals"), "w") as f:
         json.dump({"constant literals": constant_literals, "variable literals": variable_literals} , f)
-
+    return 1
 
 attr_name = ["A", "B", "C", "D", "E"]
 def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, new_graph_dir, new_metadata_dir, attr_num, attr_range, constants, variables, num_workers=32):
@@ -332,14 +332,14 @@ def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, n
     meta = read_metadata_from_dir(metadata_dir, num_workers=num_workers)
 
     os.makedirs(new_pattern_dir, exist_ok=True)
-
-    for p, pattern in patterns.items():
-        if p in graphs:
-            for g, graph in graphs[p].items():
-                with Pool(num_workers if num_workers > 0 else os.cpu_count()) as pool:
-                    state = apply_async(process, args=(p, g, pattern, meta[p][g], graph, attr_num, attr_range, constants, variables))
-                    state.get()
-                pool.close()
+    with Pool(num_workers if num_workers > 0 else os.cpu_count()) as pool:
+        for p, pattern in patterns.items():
+            if p in graphs:
+                for g, graph in graphs[p].items():
+                    with Pool(num_workers if num_workers > 0 else os.cpu_count()) as pool:
+                        state = pool.apply_async(process, args=(p, g, new_pattern_dir, new_graph_dir, new_metadata_dir, pattern, graph,meta[p][g], attr_num, attr_range, constants, variables))
+                        state.get()
+        pool.close()
 
                
 
