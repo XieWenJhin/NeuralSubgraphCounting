@@ -6,3 +6,6 @@ figs/*
 __pychache__
 *.pyc
 *.txt
+*.err
+*.log
+*.sh
