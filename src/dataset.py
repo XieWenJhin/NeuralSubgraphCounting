@@ -285,11 +285,50 @@ class GraphAdjDataset(data.Dataset):
         return dglgraph
 
     @staticmethod
+    def extend_graph(attr_name, attr_range, graph, variable_literals, constant_literals):
+        MAX_V_LABEL_VALUE = max(graph.vs["label"])
+        MAX_E_LABEL_VALUE = max(graph.es["label"])
+        
+        #for graph, add double range vertices for x.A = y.B = c and x.A = c
+        add_v_count = max(attr_range) + 1
+        o_v_count = graph.vcount()
+        graph.add_vertices(add_v_count)
+        for i in range(add_v_count):
+            graph.vs[o_v_count + i]["label"] = MAX_V_LABEL_VALUE + 1
+        graph.add_vertices(add_v_count)
+        for i in range(add_v_count):
+            graph.vs[o_v_count + add_v_count + i]["label"] = MAX_V_LABEL_VALUE + 2 + i
+        for i in range(o_v_count):
+            #extend graph with variable literals
+            v_l_attrs = []
+            for variable_literal in variable_literals:
+                u, A, v, B = variable_literal
+                A, B = int(A), int(B)
+                v_l_attrs.extend([A, B])
+            v_l_attrs = set(v_l_attrs)
+            for A in v_l_attrs:
+                A_value = graph.vs[i][attr_name[A]]
+                graph.add_edge(i, o_v_count + A_value)
+                i_2_t = graph.get_eid(i, o_v_count + A_value)
+                graph.es[i_2_t]["label"] = MAX_E_LABEL_VALUE + 1 + A
+            #extend graph with constant literals
+            for constant_literal in constant_literals:
+                u, A, c = constant_literal
+                A = int(A)
+                A_value = graph.vs[i][attr_name[A]]
+                graph.add_edges([(i, o_v_count + add_v_count + A_value)])
+                i_2_t = graph.get_eid(i, o_v_count + add_v_count + A_value)
+                graph.es[i_2_t]["label"] = MAX_E_LABEL_VALUE + 1 + A
+
+        return graph
+    @staticmethod
     def preprocess(x):
         pattern = copy.copy(x["pattern"])
         graph = copy.copy(x["graph"])
+        graph_ = copy.copy(x["graph_"])
+        [p_u, g_u], [p_v, g_v] = x["mapping"]
         attr_name  = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
-        attr_range = [8, 8, 8, 8, 8, 8, 8]
+        attr_range = [8, 8, 8, 8, 8]
         
         MAX_V_LABEL_VALUE = max(graph.vs["label"])
         MAX_E_LABEL_VALUE = max(graph.es["label"])
@@ -330,50 +369,47 @@ class GraphAdjDataset(data.Dataset):
         pattern_dglgraph.ndata["label"] = np.array(pattern.vs["label"], dtype=np.int64)
         pattern_dglgraph.ndata["id"] = np.arange(0, pattern.vcount(), dtype=np.int64)
         pattern_dglgraph.edata["label"] = np.array(pattern.es["label"], dtype=np.int64)
+        #mark fixed vertices
+        k = 8
+        pattern_weights = torch.zeros(pattern_dglgraph.number_of_nodes(), k)
+        pattern_weights[p_u,] = 1
+        pattern_weights[p_v,] = 1
+        pattern_dglgraph.ndata["w"] = pattern_weights
 
-        #for graph, add double range vertices for x.A = y.B = c and x.A = c
-        add_v_count = max(attr_range) + 1
-        o_v_count = graph.vcount()
-        graph.add_vertices(add_v_count)
-        for i in range(add_v_count):
-            graph.vs[o_v_count + i]["label"] = MAX_V_LABEL_VALUE + 1
-        graph.add_vertices(add_v_count)
-        for i in range(add_v_count):
-            graph.vs[o_v_count + add_v_count + i]["label"] = MAX_V_LABEL_VALUE + 2 + i
-        for i in range(o_v_count):
-            #extend graph with variable literals
-            v_l_attrs = []
-            for variable_literal in variable_literals:
-                u, A, v, B = variable_literal
-                A, B = int(A), int(B)
-                v_l_attrs.extend([A, B])
-            v_l_attrs = set(v_l_attrs)
-            for A in v_l_attrs:
-                A_value = graph.vs[i][attr_name[A]]
-                graph.add_edge(i, o_v_count + A_value)
-                i_2_t = graph.get_eid(i, o_v_count + A_value)
-                graph.es[i_2_t]["label"] = MAX_E_LABEL_VALUE + 1 + A
-            #extend graph with constant literals
-            for constant_literal in constant_literals:
-                u, A, c = constant_literal
-                A = int(A)
-                A_value = graph.vs[i][attr_name[A]]
-                graph.add_edges([(i, o_v_count + add_v_count + A_value)])
-                i_2_t = graph.get_eid(i, o_v_count + add_v_count + A_value)
-                graph.es[i_2_t]["label"] = MAX_E_LABEL_VALUE + 1 + A
-                
+        #exntend graph and graph_
+        graph = extend_graph(attr_name, attr_range, graph, variable_literals, constant_literals)
+        graph_ = extend_graph(attr_name, attr_range, graph, variable_literals, constant_literals)
+
         graph_dglgraph = GraphAdjDataset.graph2dglgraph(graph)
         graph_dglgraph.ndata["indeg"] = np.array(graph.indegree(), dtype=np.float32)
         graph_dglgraph.ndata["label"] = np.array(graph.vs["label"], dtype=np.int64)
         graph_dglgraph.ndata["id"] = np.arange(0, graph.vcount(), dtype=np.int64)
         graph_dglgraph.edata["label"] = np.array(graph.es["label"], dtype=np.int64)
+        #mark fixed vertices
+        graph_weights = torch.zeros(graph_dglgraph.number_of_nodes(), 8)
+        graph_weights[g_u,] = 1
+        graph_weights[g_v,] = 1
+        graph_dglgraph.ndata["w"] = graph_weights
         subisomorphisms = np.array(x["subisomorphisms"], dtype=np.int32).reshape(-1, x["pattern"].vcount())
+
+        graph_dglgraph_ = GraphAdjDataset.graph2dglgraph(graph_)
+        graph_dglgraph_.ndata["indeg"] = np.array(graph_.indegree(), dtype=np.float32)
+        graph_dglgraph_.ndata["label"] = np.array(graph_.vs["label"], dtype=np.int64)
+        graph_dglgraph_.ndata["id"] = np.arange(0, graph_.vcount(), dtype=np.int64)
+        graph_dglgraph_.edata["label"] = np.array(graph_.es["label"], dtype=np.int64)
+        #mark fixed vertices
+        graph_weights = torch.zeros(graph_dglgraph_.number_of_nodes(), 8)
+        graph_weights[g_u,] = 1
+        graph_weights[g_v,] = 1
+        graph_dglgraph_.ndata["w"] = graph_weights
 
         x = {
             "id": x["id"],
             "pattern": pattern_dglgraph,
             "graph": graph_dglgraph,
+            "graph_": graph_dglgraph_,
             "counts": x["counts"],
+            "counts_": x["counts_"],
             "subisomorphisms": subisomorphisms}
         return x
 

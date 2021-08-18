@@ -504,6 +504,9 @@ def load_data(graph_dir, pattern_dir, metadata_dir, num_workers=4):
     patterns = read_patterns_from_dir(pattern_dir, num_workers=num_workers)
     graphs = read_graphs_from_dir(graph_dir, num_workers=num_workers)
     meta = read_metadata_from_dir(metadata_dir, num_workers=num_workers)
+    #read monotonicity corresponding graphs and metadatas
+    graphs_ = read_graphs_from_dir(graph_dir + '_', num_workers=num_workers)
+    meta_ = read_graphs_from_dir(metadata_dir + '_', num_workers=num_workers)
     #add read literals from file
     literals = read_literals_from_dir(pattern_dir, num_workers=num_workers)
 
@@ -514,10 +517,20 @@ def load_data(graph_dir, pattern_dir, metadata_dir, num_workers=4):
                 x = dict()
                 x["id"] = ("%s-%s" % (p, g))
                 x["pattern"] = pattern
-                x["graph"] = graph
+                #graph_ has one more edge than graph
+                if meta[p][g]["counts"] == 1 and meta_[p][g]["counts"] == 0:
+                    x["graph"] = graphs_[p][g]
+                    x["counts"] = meta_[p][g]["counts"]
+                    x["graph_"] = graph
+                    x["counts_"] = meta[p][g]["counts"]
+                else:
+                    x["graph"] = graph
+                    x["counts"] = meta[p][g]["counts"]
+                    x["graph_"] = graphs_[p][g]
+                    x["counts_"] = meta_[p][g]["counts"]
                 x["subisomorphisms"] = meta[p][g]["subisomorphisms"]
-                x["counts"] = meta[p][g]["counts"]
                 x["literals"] = literals[p]
+                x["mapping"] = meta[p][g]["mapping"]
 
                 g_idx = int(g.rsplit("_", 1)[-1])
                 if g_idx % 10 == 0:
@@ -531,10 +544,20 @@ def load_data(graph_dir, pattern_dir, metadata_dir, num_workers=4):
                 x = dict()
                 x["id"] = ("%s-%s" % (p, g))
                 x["pattern"] = pattern
-                x["graph"] = graph
+                #graph_ has one more edge than graph
+                if meta[p][g]["counts"] == 1 and meta_[p][g]["counts"] == 0:
+                    x["graph"] = graphs_[p][g]
+                    x["counts"] = meta_[p][g]["counts"]
+                    x["graph_"] = graph
+                    x["counts_"] = meta[p][g]["counts"]
+                else:
+                    x["graph"] = graph
+                    x["counts"] = meta[p][g]["counts"]
+                    x["graph_"] = graphs_[p][g]
+                    x["counts_"] = meta_[p][g]["counts"]
                 x["subisomorphisms"] = meta[p][g]["subisomorphisms"]
-                x["counts"] = meta[p][g]["counts"]
                 x["literals"] = literals[p]
+                x["mapping"] = meta[p][g]["mapping"]
 
                 g_idx = int(g.rsplit("_", 1)[-1])
                 if g_idx % 3 == 0:
