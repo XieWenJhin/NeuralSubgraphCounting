@@ -43,7 +43,7 @@ train_config = {
     "base": 2,
 
     "gpu_id": -1,
-    "num_workers": 24,
+    "num_workers": 32,
     
     "epochs": 100,
     "batch_size": 512,
@@ -76,6 +76,7 @@ train_config = {
                                     # DIAMNet
     "predict_net_add_enc": True,
     "predict_net_add_degree": True,
+    "predict_net_fix_vertices": True,
     "predict_net_hidden_dim": 128,
     "predict_net_num_heads": 4,
     "predict_net_mem_len": 4,
@@ -144,6 +145,8 @@ def train(model, optimizer, scheduler, data_type, data_loader, device, config, e
         reg_crit = lambda pred, target: F.mse_loss(F.relu(pred), target)
     elif config["reg_loss"] == "SMSE":
         reg_crit = lambda pred, target: F.smooth_l1_loss(F.relu(pred), target)
+    elif config["reg_loss"] == "BCE":
+        reg_crit = lambda pred, target: F.binary_cross_entropy_with_logits(pred, target)
     else:
         raise NotImplementedError
 
@@ -153,22 +156,26 @@ def train(model, optimizer, scheduler, data_type, data_loader, device, config, e
         bp_crit = lambda pred, target, neg_slp: F.mse_loss(F.leaky_relu(pred, neg_slp), target)
     elif config["bp_loss"] == "SMSE":
         bp_crit = lambda pred, target, neg_slp: F.smooth_l1_loss(F.leaky_relu(pred, neg_slp), target)
+    elif config["reg_loss"] == "CE":
+        reg_crit = lambda pred, target, neg_slp: F.binary_cross_entropy_with_logits(F.leaky_relu(pred, neg_slp), target)
     else:
         raise NotImplementedError
 
     model.train()
 
     for batch_id, batch in enumerate(data_loader):
-        ids, pattern, pattern_len, graph, graph_len, counts = batch
+        ids, pattern, pattern_len, graph, graph_, graph_len, graph_len_, counts, counts_ = batch
         cnt = counts.shape[0]
         total_cnt += cnt
 
         pattern.to(device)
         graph.to(device)
+        graph_.to(device)
         pattern_len, graph_len, counts = pattern_len.to(device), graph_len.to(device), counts.to(device)
+        graph_len_, counts_ = graph_len_.to(device), counts_.to(device)
+        pred = model(pattern, pattern_len, graph, graph_, graph_len, graph_len_)
 
-        pred = model(pattern, pattern_len, graph, graph_len)
-
+        #TODO design loss function
         reg_loss = reg_crit(pred, counts)
         
         if isinstance(config["bp_loss_slp"], (int, float)):

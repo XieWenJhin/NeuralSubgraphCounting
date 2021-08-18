@@ -428,7 +428,10 @@ class GraphAdjDataset(data.Dataset):
         pattern = dgl.batch([x["pattern"] for x in batch])
         pattern_len = torch.tensor([x["pattern"].number_of_nodes() for x in batch], dtype=torch.int32).view(-1, 1)
         graph = dgl.batch([x["graph"] for x in batch])
+        graph_ = dgl.batch([x["graph_"] for x in batch])
         graph_len = torch.tensor([x["graph"].number_of_nodes() for x in batch], dtype=torch.int32).view(-1, 1)
+        graph_len_ = torch.tensor([x["graph_"].number_of_nodes() for x in batch], dtype=torch.int32).view(-1, 1)
         counts = torch.tensor([x["counts"] for x in batch], dtype=torch.float32).view(-1, 1)
-        return _id, pattern, pattern_len, graph, graph_len, counts
+        counts_ = torch.tensor([x["counts_"] for x in batch], dtype=torch.float32).view(-1, 1)
+        return _id, pattern, pattern_len, graph, graph_, graph_len, graph_len_, counts, counts_
             

@@ -75,7 +75,9 @@ class RGIN(GraphAdjModel):
         if self.add_degree:
             p_dim += 1
             g_dim += 1
-        
+        if self.fix_vertices:
+            p_dim += 8
+            g_dim += 8
         self.predict_net = self.create_predict_net(config["predict_net"],
             pattern_dim=p_dim, graph_dim=g_dim, hidden_dim=config["predict_net_hidden_dim"],
             num_heads=config["predict_net_num_heads"], recurrent_steps=config["predict_net_recurrent_steps"], 
@@ -203,12 +205,15 @@ class RGIN(GraphAdjModel):
             del self.p_net
             self.p_net = p_net
 
-    def forward(self, pattern, pattern_len, graph, graph_len):
+    def forward(self, pattern, pattern_len, graph, graph_, graph_len, graph_len_):
         bsz = pattern_len.size(0)
 
         gate = self.get_filter_gate(pattern, pattern_len, graph, graph_len)
         zero_mask = (gate == 0) if gate is not None else None
+
         pattern_emb, graph_emb = self.get_emb(pattern, pattern_len, graph, graph_len)
+        pattern_emb, graph_emb_ = self.get_emb(pattern, pattern_len, graph_, graph_len_)
+
         if zero_mask is not None:
             graph_emb.masked_fill_(zero_mask, 0.0)
 
@@ -223,8 +228,23 @@ class RGIN(GraphAdjModel):
             graph_output = o + graph_output
             if zero_mask is not None:
                 graph_output.masked_fill_(zero_mask, 0.0)
+        #同一个RGIN，是否会导致bp产生问题？梯度可能double，但是是同一套参数？
+        graph_output_ = graph_emb_
+        for g_rgin in self.g_net:
+            o_ = g_rgin(graph_, graph_output_, graph_.edata["label"])
+            graph_output_ = o_ + graph_output_
+            if zero_mask is not None:
+                graph_output.masked_fill_(zero_mask, 0.0)
         
-        if self.add_enc and self.add_degree:
+        if self.add_enc and self.add_degree and self.fix_vertices:
+            pattern_enc, graph_enc = self.get_enc(pattern, pattern_len, graph, graph_len)
+            pattern_enc, graph_enc_ = self.get_enc(pattern, pattern_len, graph, graph_len)
+            if zero_mask is not None:
+                graph_enc.masked_fill_(zero_mask, 0.0)
+            pattern_output = torch.cat([pattern_enc, pattern.ndata["w"], pattern_output, pattern.ndata["indeg"].unsqueeze(-1)], dim=1)
+            graph_output = torch.cat([graph_enc,graph.ndata["w"], graph_output, graph.ndata["indeg"].unsqueeze(-1)], dim=1)
+            graph_output_ = torch.cat([graph_enc_,graph_.ndata["w"], graph_output_, graph_.ndata["indeg"].unsqueeze(-1)], dim=1)
+        elif self.add_enc and self.add_degree:
             pattern_enc, graph_enc = self.get_enc(pattern, pattern_len, graph, graph_len)
             if zero_mask is not None:
                 graph_enc.masked_fill_(zero_mask, 0.0)
@@ -240,6 +260,7 @@ class RGIN(GraphAdjModel):
             pattern_output = torch.cat([pattern_output, pattern.ndata["indeg"].unsqueeze(-1)], dim=1)
             graph_output = torch.cat([graph_output, graph.ndata["indeg"].unsqueeze(-1)], dim=1)
         
+        #TODO revise predict net
         pred = self.predict_net(
             split_and_batchify_graph_feats(pattern_output, pattern_len)[0], pattern_len, 
             split_and_batchify_graph_feats(graph_output, graph_len)[0], graph_len)

@@ -374,11 +374,6 @@ class GraphAdjModel(BaseModel):
             self.p_v_enc, self.p_vl_enc = \
                 [self.create_enc(max_n, self.base) for max_n in [self.max_npv, self.max_npvl]]
 
-        # create attributes encoding layer
-        # Warning: 4 shoule be replaced by value num of corresponding attr
-        self.g_attr_enc = self.create_enc(4, self.base)
-        self.p_attr_enc = self.create_enc(4, self.base)
-
         # create filter layers
         self.vl_flt = self.create_filter(config["filter_net"])
 
@@ -409,19 +404,6 @@ class GraphAdjModel(BaseModel):
         p_enc = torch.cat([pattern_v, pattern_vl], dim=1)
         g_enc = torch.cat([graph_v, graph_vl], dim=1)
         return p_enc, g_enc
-    
-    #Warning: need modify for dynamic attr range!
-    def get_attr_enc(self, pattern, graph):
-        p_A_enc = self.p_attr_enc(pattern.ndata["A"])
-        p_B_enc = self.p_attr_enc(pattern.ndata["B"])
-        p_C_enc = self.p_attr_enc(pattern.ndata["C"])
-        p_attr_enc = torch.cat([p_A_enc, p_B_enc, p_C_enc], dim=1)
-
-        g_A_enc = self.g_attr_enc(graph.ndata["A"])
-        g_B_enc = self.g_attr_enc(graph.ndata["B"])
-        g_C_enc = self.g_attr_enc(graph.ndata["C"])
-        g_attr_enc = torch.cat([g_A_enc, g_B_enc, g_C_enc], dim=1)
-        return p_attr_enc, g_attr_enc
 
     def get_emb(self, pattern, pattern_len, graph, graph_len):
         bsz = pattern_len.size(0)
