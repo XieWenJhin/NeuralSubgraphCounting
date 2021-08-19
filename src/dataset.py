@@ -10,7 +10,7 @@ import torch.utils.data as data
 from collections import defaultdict, Counter
 from tqdm import tqdm
 from utils import get_enc_len, int2onehot, \
-    batch_convert_tensor_to_tensor, batch_convert_array_to_array
+    batch_convert_tensor_to_tensor, batch_convert_array_to_array, extend_graph
 
 INF = float("inf")
 
@@ -285,43 +285,6 @@ class GraphAdjDataset(data.Dataset):
         return dglgraph
 
     @staticmethod
-    def extend_graph(attr_name, attr_range, graph, variable_literals, constant_literals):
-        MAX_V_LABEL_VALUE = max(graph.vs["label"])
-        MAX_E_LABEL_VALUE = max(graph.es["label"])
-        
-        #for graph, add double range vertices for x.A = y.B = c and x.A = c
-        add_v_count = max(attr_range) + 1
-        o_v_count = graph.vcount()
-        graph.add_vertices(add_v_count)
-        for i in range(add_v_count):
-            graph.vs[o_v_count + i]["label"] = MAX_V_LABEL_VALUE + 1
-        graph.add_vertices(add_v_count)
-        for i in range(add_v_count):
-            graph.vs[o_v_count + add_v_count + i]["label"] = MAX_V_LABEL_VALUE + 2 + i
-        for i in range(o_v_count):
-            #extend graph with variable literals
-            v_l_attrs = []
-            for variable_literal in variable_literals:
-                u, A, v, B = variable_literal
-                A, B = int(A), int(B)
-                v_l_attrs.extend([A, B])
-            v_l_attrs = set(v_l_attrs)
-            for A in v_l_attrs:
-                A_value = graph.vs[i][attr_name[A]]
-                graph.add_edge(i, o_v_count + A_value)
-                i_2_t = graph.get_eid(i, o_v_count + A_value)
-                graph.es[i_2_t]["label"] = MAX_E_LABEL_VALUE + 1 + A
-            #extend graph with constant literals
-            for constant_literal in constant_literals:
-                u, A, c = constant_literal
-                A = int(A)
-                A_value = graph.vs[i][attr_name[A]]
-                graph.add_edges([(i, o_v_count + add_v_count + A_value)])
-                i_2_t = graph.get_eid(i, o_v_count + add_v_count + A_value)
-                graph.es[i_2_t]["label"] = MAX_E_LABEL_VALUE + 1 + A
-
-        return graph
-    @staticmethod
     def preprocess(x):
         pattern = copy.copy(x["pattern"])
         graph = copy.copy(x["graph"])
@@ -378,7 +341,7 @@ class GraphAdjDataset(data.Dataset):
 
         #exntend graph and graph_
         graph = extend_graph(attr_name, attr_range, graph, variable_literals, constant_literals)
-        graph_ = extend_graph(attr_name, attr_range, graph, variable_literals, constant_literals)
+        graph_ = extend_graph(attr_name, attr_range, graph_, variable_literals, constant_literals)
 
         graph_dglgraph = GraphAdjDataset.graph2dglgraph(graph)
         graph_dglgraph.ndata["indeg"] = np.array(graph.indegree(), dtype=np.float32)
