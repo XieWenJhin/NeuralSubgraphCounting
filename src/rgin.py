@@ -205,7 +205,7 @@ class RGIN(GraphAdjModel):
             del self.p_net
             self.p_net = p_net
 
-    def forward(self, pattern, pattern_len, graph, graph_, graph_len, graph_len_):
+    def forward(self, pattern, pattern_len, graph, graph_len, graph_, graph_len_):
         bsz = pattern_len.size(0)
 
         gate = self.get_filter_gate(pattern, pattern_len, graph, graph_len)
@@ -260,9 +260,10 @@ class RGIN(GraphAdjModel):
             pattern_output = torch.cat([pattern_output, pattern.ndata["indeg"].unsqueeze(-1)], dim=1)
             graph_output = torch.cat([graph_output, graph.ndata["indeg"].unsqueeze(-1)], dim=1)
         
-        #TODO revise predict net
-        pred = self.predict_net(
+        #revise predict net
+        pred, pred_ = self.predict_net(
             split_and_batchify_graph_feats(pattern_output, pattern_len)[0], pattern_len, 
-            split_and_batchify_graph_feats(graph_output, graph_len)[0], graph_len)
+            split_and_batchify_graph_feats(graph_output, graph_len)[0], graph_len,
+            split_and_batchify_graph_feats(graph_output_,graph_len_)[0], graph_len_)
         
-        return pred
+        return pred, pred_

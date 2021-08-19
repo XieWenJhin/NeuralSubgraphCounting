@@ -173,17 +173,19 @@ def train(model, optimizer, scheduler, data_type, data_loader, device, config, e
         graph_.to(device)
         pattern_len, graph_len, counts = pattern_len.to(device), graph_len.to(device), counts.to(device)
         graph_len_, counts_ = graph_len_.to(device), counts_.to(device)
-        pred = model(pattern, pattern_len, graph, graph_, graph_len, graph_len_)
+        pred, pred_ = model(pattern, pattern_len, graph, graph_len, graph_, graph_len_)
 
         #TODO design loss function
-        reg_loss = reg_crit(pred, counts)
+        reg_loss = reg_crit(pred, counts) + reg_crit(pred_, counts_)
+        print(pred, counts)
+        print(pred_, counts_)
         
         if isinstance(config["bp_loss_slp"], (int, float)):
             neg_slp = float(config["bp_loss_slp"])
         else:
             bp_loss_slp, l0, l1 = config["bp_loss_slp"].rsplit("$", 3)
             neg_slp = anneal_fn(bp_loss_slp, batch_id+epoch*epoch_step, T=total_step//4, lambda0=float(l0), lambda1=float(l1))
-        bp_loss = bp_crit(pred, counts, neg_slp)
+        bp_loss = bp_crit(pred, counts, neg_slp) + bp_crit(pred_, counts_, neg_slp)
 
         reg_loss_item = reg_loss.item()
         bp_loss_item = bp_loss.item()

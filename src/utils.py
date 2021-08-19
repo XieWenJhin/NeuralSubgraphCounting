@@ -509,7 +509,9 @@ def load_data(graph_dir, pattern_dir, metadata_dir, num_workers=4):
     meta_ = read_graphs_from_dir(metadata_dir + '_', num_workers=num_workers)
     #add read literals from file
     literals = read_literals_from_dir(pattern_dir, num_workers=num_workers)
+    print(graphs)
 
+    print(graphs_)
     train_data, dev_data, test_data = list(), list(), list()
     for p, pattern in patterns.items():
         if p in graphs:

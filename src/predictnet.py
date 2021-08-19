@@ -535,14 +535,15 @@ class SumPredictNet(BasePoolPredictNet):
     def __init__(self, pattern_dim, graph_dim, hidden_dim, act_func="relu", dropout=0.0):
         super(SumPredictNet, self).__init__(pattern_dim, graph_dim, hidden_dim, act_func, dropout)
 
-    def forward(self, pattern, pattern_len, graph, graph_len):
+    def forward(self, pattern, pattern_len, graph, graph_len, graph_, graph_len_):
         bsz = pattern_len.size(0)
-        p_len, g_len = pattern.size(1), graph.size(1)
-        plf, glf = pattern_len.float(), graph_len.float()
-        inv_plf, inv_glf = 1.0 / plf, 1.0 / glf
+        p_len, g_len, g_len_ = pattern.size(1), graph.size(1), graph_.size(1)
+        plf, glf, glf_ = pattern_len.float(), graph_len.float(), graph_len_.float()
+        inv_plf, inv_glf, inv_glf_ = 1.0 / plf, 1.0 / glf, 1.0 / glf_
 
         p = self.drop(self.p_layer(torch.sum(pattern, dim=1, keepdim=True)))
         g = self.drop(self.g_layer(graph))
+        g_ = self.drop(self.g_layer(graph_))
 
         p = p.squeeze(1)
         g = torch.sum(g, dim=1)
@@ -550,7 +551,12 @@ class SumPredictNet(BasePoolPredictNet):
         y = self.act(y)
         y = self.pred_layer2(torch.cat([y, plf, glf, inv_plf, inv_glf], dim=1))
 
-        return y
+        g_ = torch.sum(g_, dim=1)
+        y_ = self.pred_layer1(torch.cat([p, g_, g_-p, g_*p, plf, glf_, inv_plf, inv_glf_], dim=1))
+        y_ = self.act(y_)
+        y_ = self.pred_layer2(torch.cat([y_, plf, glf_, inv_plf, inv_glf_], dim=1))
+        
+        return y, y_
 
 
 class MaxPredictNet(BasePoolPredictNet):
