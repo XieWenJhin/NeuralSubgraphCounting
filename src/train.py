@@ -60,7 +60,7 @@ train_config = {
     "bp_loss_slp": "anneal_cosine$1.0$0.01",    # 0, 0.01, logistic$1.0$0.01, linear$1.0$0.01, cosine$1.0$0.01, 
                                                 # cyclical_logistic$1.0$0.01, cyclical_linear$1.0$0.01, cyclical_cosine$1.0$0.01
                                                 # anneal_logistic$1.0$0.01, anneal_linear$1.0$0.01, anneal_cosine$1.0$0.01
-    "lr": 0.001,
+    "lr": 0.00001,
     "weight_decay": 0.00001,
     "max_grad_norm": 8,
 
@@ -157,7 +157,7 @@ def train(model, optimizer, scheduler, data_type, data_loader, device, config, e
     elif config["bp_loss"] == "SMSE":
         bp_crit = lambda pred, target, neg_slp: F.smooth_l1_loss(F.leaky_relu(pred, neg_slp), target)
     elif config["reg_loss"] == "CE":
-        bp_crit = lambda pred, target, neg_slp: F.binary_cross_entropy_with_logits(pred, target)
+        bp_crit = lambda pred, target, neg_slp: F.binary_cross_entropy_with_logits(F.leaky_relu(pred, neg_slp), target)
     else:
         raise NotImplementedError
 
@@ -174,20 +174,20 @@ def train(model, optimizer, scheduler, data_type, data_loader, device, config, e
 
         pred = model(pattern, pattern_len, graph, graph_len)
 
-        #add a dim for cross entropy loss
-        d = torch.ones(counts.numel()).reshape(counts.shape)
-        d = d.to(device)
-        d = d - counts
-        label = torch.cat([d,counts],dim = 1)
+        # #add a dim for cross entropy loss
+        # d = torch.ones(counts.numel()).reshape(counts.shape)
+        # d = d.to(device)
+        # d = d - counts
+        # label = torch.cat([d,counts],dim = 1)
 
-        reg_loss = reg_crit(pred, label)
+        reg_loss = reg_crit(pred, counts)
         
         if isinstance(config["bp_loss_slp"], (int, float)):
             neg_slp = float(config["bp_loss_slp"])
         else:
             bp_loss_slp, l0, l1 = config["bp_loss_slp"].rsplit("$", 3)
             neg_slp = anneal_fn(bp_loss_slp, batch_id+epoch*epoch_step, T=total_step//4, lambda0=float(l0), lambda1=float(l1))
-        bp_loss = bp_crit(pred, label, neg_slp)
+        bp_loss = bp_crit(pred, counts, neg_slp)
 
         reg_loss_item = reg_loss.item()
         bp_loss_item = bp_loss.item()
@@ -199,10 +199,10 @@ def train(model, optimizer, scheduler, data_type, data_loader, device, config, e
             writer.add_scalar("%s/BP-%s" % (data_type, config["bp_loss"]), bp_loss_item, epoch*epoch_step+batch_id)
 
         if logger and (batch_id % config["print_every"] == 0 or batch_id == epoch_step-1):
-            logger.info("epoch: {:0>3d}/{:0>3d}\tdata_type: {:<5s}\tbatch: {:0>5d}/{:0>5d}\treg loss: {:0>10.3f}\tbp loss: {:0>16.3f}\tground: {:.3f}\tpredict_0: {:.3f}\tpredict_1: {:.3f}".format(
+            logger.info("epoch: {:0>3d}/{:0>3d}\tdata_type: {:<5s}\tbatch: {:0>5d}/{:0>5d}\treg loss: {:0>10.3f}\tbp loss: {:0>16.3f}\tground: {:.3f}\tpredict_0: {:.3f}".format(
                 epoch, config["epochs"], data_type, batch_id, epoch_step,
                 reg_loss_item, bp_loss_item,
-                counts[0].item(),pred[0][0].item(), pred[0][1].item()))
+                counts[0].item(),pred[0].item()))
 
         bp_loss.backward()
         if (config["update_every"] < 2 or batch_id % config["update_every"] == 0 or batch_id == epoch_step-1):
@@ -243,7 +243,7 @@ def evaluate(model, data_type, data_loader, device, config, epoch, logger=None, 
     elif config["reg_loss"] == "SMSE":
         reg_crit = lambda pred, target: F.smooth_l1_loss(F.relu(pred), target, reduce="none")
     elif config["reg_loss"] == "CE": #Cross Entropy 
-        reg_crit = lambda pred, target: F.binary_cross_entropy_with_logits(pred, target)
+        reg_crit = lambda pred, target: F.binary_cross_entropy_with_logits(pred, target, reduce="none")
     else:
         raise NotImplementedError
 
@@ -254,7 +254,7 @@ def evaluate(model, data_type, data_loader, device, config, epoch, logger=None, 
     elif config["bp_loss"] == "SMSE":
         bp_crit = lambda pred, target, neg_slp: F.smooth_l1_loss(F.leaky_relu(pred, neg_slp), target, reduce="none")
     elif config["reg_loss"] == "CE":
-        bp_crit = lambda pred, target, neg_slp: F.binary_cross_entropy_with_logits(pred, target)
+        bp_crit = lambda pred, target, neg_slp: F.binary_cross_entropy_with_logits(F.leaky_relu(pred,neg_slp), target, reduce="none")
     else:
         raise NotImplementedError
 
@@ -309,10 +309,10 @@ def evaluate(model, data_type, data_loader, device, config, epoch, logger=None, 
                 writer.add_scalar("%s/BP-%s" % (data_type, config["bp_loss"]), bp_loss_item, epoch*epoch_step+batch_id)
 
             if logger and batch_id == epoch_step-1:
-                logger.info("epoch: {:0>3d}/{:0>3d}\tdata_type: {:<5s}\tbatch: {:0>5d}/{:0>5d}\treg loss: {:0>10.3f}\tbp loss: {:0>16.3f}\tground: {:.3f}\tpredict_0: {:.3f}\tpredict_1: {:.3f}".format(
+                logger.info("epoch: {:0>3d}/{:0>3d}\tdata_type: {:<5s}\tbatch: {:0>5d}/{:0>5d}\treg loss: {:0>10.3f}\tbp loss: {:0>16.3f}\tground: {:.3f}\tpredict_0: {:.3f}".format(
                     epoch, config["epochs"], data_type, batch_id, epoch_step,
                     reg_loss_item, bp_loss_item,
-                    counts[0].item(), pred[0][0].item(), pred[0][1].item()))
+                    counts[0].item(), pred[0].item()))
         mean_reg_loss = total_reg_loss/total_cnt
         mean_bp_loss = total_bp_loss/total_cnt
         if writer:

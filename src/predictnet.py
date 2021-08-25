@@ -482,7 +482,7 @@ class BasePoolPredictNet(nn.Module):
         self.g_layer = nn.Linear(graph_dim, hidden_dim)
 
         self.pred_layer1 = nn.Linear(self.hidden_dim*4+4, self.hidden_dim)
-        self.pred_layer2 = nn.Linear(self.hidden_dim+4, 2)
+        self.pred_layer2 = nn.Linear(self.hidden_dim+4, 1)
 
         # init
         for layer in [self.p_layer, self.g_layer, self.pred_layer1]:
