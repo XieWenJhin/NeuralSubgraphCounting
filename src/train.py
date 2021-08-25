@@ -55,12 +55,12 @@ train_config = {
     "dropout": 0.2,
     "dropatt": 0.2,
     
-    "reg_loss": "BCE", # MAE, MSEl
-    "bp_loss": "BCE", # MAE, MSE
+    "reg_loss": "MSE", # MAE, MSEl
+    "bp_loss": "MSE", # MAE, MSE
     "bp_loss_slp": "anneal_cosine$1.0$0.01",    # 0, 0.01, logistic$1.0$0.01, linear$1.0$0.01, cosine$1.0$0.01, 
                                                 # cyclical_logistic$1.0$0.01, cyclical_linear$1.0$0.01, cyclical_cosine$1.0$0.01
                                                 # anneal_logistic$1.0$0.01, anneal_linear$1.0$0.01, anneal_cosine$1.0$0.01
-    "lr": 0.001,
+    "lr": 0.0000001,
     "weight_decay": 0.00001,
     "max_grad_norm": 8,
 
@@ -178,15 +178,18 @@ def train(model, optimizer, scheduler, data_type, data_loader, device, config, e
         pred, pred_ = model(pattern, pattern_len, graph, graph_len, graph_, graph_len_)
 
         #TODO design loss function
-        reg_loss = reg_crit(pred, counts) + reg_crit(pred_, counts_)
+        reg_loss = reg_crit(pred, counts)
+        print(pred)
+        print(counts)
+        print(reg_loss)
         
         if isinstance(config["bp_loss_slp"], (int, float)):
             neg_slp = float(config["bp_loss_slp"])
         else:
             bp_loss_slp, l0, l1 = config["bp_loss_slp"].rsplit("$", 3)
             neg_slp = anneal_fn(bp_loss_slp, batch_id+epoch*epoch_step, T=total_step//4, lambda0=float(l0), lambda1=float(l1))
-        bp_loss = bp_crit(pred, counts, neg_slp) + bp_crit(pred_, counts_, neg_slp)
-
+        bp_loss = bp_crit(pred, counts, neg_slp)
+        
         reg_loss_item = reg_loss.item()
         bp_loss_item = bp_loss.item()
         total_reg_loss += reg_loss_item * cnt

@@ -628,3 +628,5 @@ def extend_graph(attr_name, attr_range, graph, variable_literals, constant_liter
             graph.es[i_2_t]["label"] = MAX_E_LABEL_VALUE + 1 + A
 
     return graph
+
+
