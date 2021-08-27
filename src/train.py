@@ -55,12 +55,12 @@ train_config = {
     "dropout": 0.2,
     "dropatt": 0.2,
     
-    "reg_loss": "MSE", # MAE, MSEl
-    "bp_loss": "MSE", # MAE, MSE
+    "reg_loss": "BCE", # MAE, MSEl
+    "bp_loss": "BCE", # MAE, MSE
     "bp_loss_slp": "anneal_cosine$1.0$0.01",    # 0, 0.01, logistic$1.0$0.01, linear$1.0$0.01, cosine$1.0$0.01, 
                                                 # cyclical_logistic$1.0$0.01, cyclical_linear$1.0$0.01, cyclical_cosine$1.0$0.01
                                                 # anneal_logistic$1.0$0.01, anneal_linear$1.0$0.01, anneal_cosine$1.0$0.01
-    "lr": 0.001,
+    "lr": 0.00001,
     "weight_decay": 0.00001,
     "max_grad_norm": 8,
 
@@ -175,20 +175,20 @@ def train(model, optimizer, scheduler, data_type, data_loader, device, config, e
         pred = model(pattern, pattern_len, graph, graph_len)
         #pred = torch.clamp(pred, min = -10, max = 10)
         #add a dim for cross entropy loss
-        d = torch.ones(counts.numel()).reshape(counts.shape)
-        d = d.to(device)
-        d = d - counts
-        label = torch.cat([d,counts],dim = 1)
+        # d = torch.ones(counts.numel()).reshape(counts.shape)
+        # d = d.to(device)
+        # d = d - counts
+        # label = torch.cat([d,counts],dim = 1)
         # counts = counts.long()
         # counts = counts.reshape(1,-1).squeeze(dim=0)
-        reg_loss = reg_crit(pred, label)
+        reg_loss = reg_crit(pred, counts)
         
         if isinstance(config["bp_loss_slp"], (int, float)):
             neg_slp = float(config["bp_loss_slp"])
         else:
             bp_loss_slp, l0, l1 = config["bp_loss_slp"].rsplit("$", 3)
             neg_slp = anneal_fn(bp_loss_slp, batch_id+epoch*epoch_step, T=total_step//4, lambda0=float(l0), lambda1=float(l1))
-        bp_loss = bp_crit(pred, label, neg_slp)
+        bp_loss = bp_crit(pred, counts)
         reg_loss_item = reg_loss.item()
         bp_loss_item = bp_loss.item()
         total_reg_loss += reg_loss_item * cnt
@@ -200,7 +200,7 @@ def train(model, optimizer, scheduler, data_type, data_loader, device, config, e
         # res = (res == counts).int().sum()
         # acc = res.item() / counts.shape[0]
         print("pred: ", pred)
-        print("counts: ", label)
+        print("counts: ", counts)
         #print("batch id: {:0>3d}\tacc: {:.3f}".format(batch_id, acc))
         
         if writer:
@@ -208,10 +208,10 @@ def train(model, optimizer, scheduler, data_type, data_loader, device, config, e
             writer.add_scalar("%s/BP-%s" % (data_type, config["bp_loss"]), bp_loss_item, epoch*epoch_step+batch_id)
 
         if logger and (batch_id % config["print_every"] == 0 or batch_id == epoch_step-1):
-            logger.info("epoch: {:0>3d}/{:0>3d}\tdata_type: {:<5s}\tbatch: {:0>5d}/{:0>5d}\treg loss: {:0>10.3f}\tbp loss: {:0>16.3f}\tground: {:.3f}\tpredict_0: {:.3f}\tpredict_1: {:.3f}".format(
+            logger.info("epoch: {:0>3d}/{:0>3d}\tdata_type: {:<5s}\tbatch: {:0>5d}/{:0>5d}\treg loss: {:0>10.3f}\tbp loss: {:0>16.3f}\tground: {:.3f}\tpredict: {:.3f}".format(
                 epoch, config["epochs"], data_type, batch_id, epoch_step,
                 reg_loss_item, bp_loss_item,
-                counts[0].item(),pred[0][0].item(), pred[0][1].item()))
+                counts[0].item(),pred[0].item()))
 
         bp_loss.backward()
         if (config["update_every"] < 2 or batch_id % config["update_every"] == 0 or batch_id == epoch_step-1):
@@ -251,7 +251,7 @@ def evaluate(model, data_type, data_loader, device, config, epoch, logger=None, 
         reg_crit = lambda pred, target: F.mse_loss(F.relu(pred), target, reduce="none")
     elif config["reg_loss"] == "SMSE":
         reg_crit = lambda pred, target: F.smooth_l1_loss(F.relu(pred), target, reduce="none")
-    elif config["reg_loss"] == "BCE": #Cross Entropy 
+    elif config["reg_loss"] == "BCE": 
         reg_crit = lambda pred, target: F.binary_cross_entropy_with_logits(pred, target, reduce="none")
     else:
         raise NotImplementedError
@@ -282,10 +282,10 @@ def evaluate(model, data_type, data_loader, device, config, epoch, logger=None, 
             graph.to(device)
             pattern_len, graph_len, counts = pattern_len.to(device), graph_len.to(device), counts.to(device)
 
-            d = torch.ones(counts.numel()).reshape(counts.shape)
-            d = d.to(device)
-            d = d - counts
-            label = torch.cat([d,counts],dim = 1)
+            # d = torch.ones(counts.numel()).reshape(counts.shape)
+            # d = d.to(device)
+            # d = d - counts
+            # label = torch.cat([d,counts],dim = 1)
 
             st = time.time()
             pred = model(pattern, pattern_len, graph, graph_len)
@@ -298,26 +298,26 @@ def evaluate(model, data_type, data_loader, device, config, epoch, logger=None, 
 
             # counts = counts.long()
             # counts = counts.reshape(1,-1).squeeze(dim=0)
-            reg_loss = reg_crit(pred, label)
+            reg_loss = reg_crit(pred, counts)
             
             if isinstance(config["bp_loss_slp"], (int, float)):
                 neg_slp = float(config["bp_loss_slp"])
             else:
                 bp_loss_slp, l0, l1 = config["bp_loss_slp"].rsplit("$", 3)
                 neg_slp = anneal_fn(bp_loss_slp, batch_id+epoch*epoch_step, T=total_step//4, lambda0=float(l0), lambda1=float(l1))
-            bp_loss = bp_crit(pred, label, neg_slp)
+            bp_loss = bp_crit(pred, counts)
             
             reg_loss_item = reg_loss.mean().item()
             bp_loss_item = bp_loss.mean().item()
             total_reg_loss += reg_loss_item * cnt
             total_bp_loss += bp_loss_item * cnt
             
-            # res = pred[:,0] < pred[:,1]
-            # res = res.reshape(-1, 1).int()
-            # res = (res == counts).int().sum()
-            # acc = res.item() / counts.shape[0]
+            res = pred > 0.5
+            res = res.reshape(-1, 1).int()
+            res = (res == counts).int().sum()
+            acc = res.item() / counts.shape[0]
             print("pred: ", pred)
-            print("counts: ", label)
+            print("counts: ", counts)
             #print("batch id: {:0>3d}\tacc: {:.3f}".format(batch_id, acc))
 
             #evaluate_results["error"]["mae"] += F.l1_loss(F.relu(pred), counts, reduce="none").sum().item()
@@ -328,10 +328,10 @@ def evaluate(model, data_type, data_loader, device, config, epoch, logger=None, 
                 writer.add_scalar("%s/BP-%s" % (data_type, config["bp_loss"]), bp_loss_item, epoch*epoch_step+batch_id)
 
             if logger and batch_id == epoch_step-1:
-                logger.info("epoch: {:0>3d}/{:0>3d}\tdata_type: {:<5s}\tbatch: {:0>5d}/{:0>5d}\treg loss: {:0>10.3f}\tbp loss: {:0>16.3f}\tground: {:.3f}\tpredict_0: {:.3f}\tpredict_1: {:.3f}".format(
+                logger.info("epoch: {:0>3d}/{:0>3d}\tdata_type: {:<5s}\tbatch: {:0>5d}/{:0>5d}\treg loss: {:0>10.3f}\tbp loss: {:0>16.3f}\tground: {:.3f}\tpredict: {:.3f}".format(
                     epoch, config["epochs"], data_type, batch_id, epoch_step,
                     reg_loss_item, bp_loss_item,
-                    counts[0].item(), pred[0][0].item(), pred[0][1].item()))
+                    counts[0].item(), pred[0].item()))
         mean_reg_loss = total_reg_loss/total_cnt
         mean_bp_loss = total_bp_loss/total_cnt
         if writer:
