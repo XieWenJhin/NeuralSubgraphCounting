@@ -195,10 +195,9 @@ def train(model, optimizer, scheduler, data_type, data_loader, device, config, e
         total_bp_loss += bp_loss_item * cnt
 
 
-        # res = pred[:,0] < pred[:,1]
-        # res = res.reshape(-1, 1).int()
-        # res = (res == counts).int().sum()
-        # acc = res.item() / counts.shape[0]
+        res = (pred > 0.5).int()
+        res = (res == counts).int().sum()
+        acc = res.item() / counts.shape[0]
         print("pred: ", pred)
         print("counts: ", counts)
         #print("batch id: {:0>3d}\tacc: {:.3f}".format(batch_id, acc))
