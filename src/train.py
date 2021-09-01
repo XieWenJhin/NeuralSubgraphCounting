@@ -45,7 +45,7 @@ train_config = {
     "gpu_id": -1,
     "num_workers": 48,
     
-    "epochs": 100,
+    "epochs": 10,
     "batch_size": 256,
     "update_every": 1, # actual batch_sizer = batch_size * update_every
     "print_every": 1,
@@ -194,13 +194,13 @@ def train(model, optimizer, scheduler, data_type, data_loader, device, config, e
         total_reg_loss += reg_loss_item * cnt
         total_bp_loss += bp_loss_item * cnt
 
-
-        res = (pred > 0.5).int()
+        sigmoid = torch.nn.Sigmoid()
+        res = (sigmoid(pred) > 0.5).int()
         res = (res == counts).int().sum()
         acc = res.item() / counts.shape[0]
-        print("pred: ", pred)
-        print("counts: ", counts)
-        #print("batch id: {:0>3d}\tacc: {:.3f}".format(batch_id, acc))
+        # print("pred: ", pred)
+        # print("counts: ", counts)
+        print("batch id: {:0>3d}\tacc: {:.3f}".format(batch_id, acc))
         
         if writer:
             writer.add_scalar("%s/REG-%s" % (data_type, config["reg_loss"]), reg_loss_item, epoch*epoch_step+batch_id)
@@ -210,7 +210,7 @@ def train(model, optimizer, scheduler, data_type, data_loader, device, config, e
             logger.info("epoch: {:0>3d}/{:0>3d}\tdata_type: {:<5s}\tbatch: {:0>5d}/{:0>5d}\treg loss: {:0>10.3f}\tbp loss: {:0>16.3f}\tground: {:.3f}\tpredict: {:.3f}".format(
                 epoch, config["epochs"], data_type, batch_id, epoch_step,
                 reg_loss_item, bp_loss_item,
-                counts[0].item(),pred[0].item()))
+                counts[0].item(), sigmoid(pred)[0].item()))
 
         bp_loss.backward()
         if (config["update_every"] < 2 or batch_id % config["update_every"] == 0 or batch_id == epoch_step-1):
@@ -311,13 +311,13 @@ def evaluate(model, data_type, data_loader, device, config, epoch, logger=None, 
             total_reg_loss += reg_loss_item * cnt
             total_bp_loss += bp_loss_item * cnt
             
-            res = pred > 0.5
-            res = res.reshape(-1, 1).int()
+            sigmoid = torch.nn.Sigmoid()
+            res = (sigmoid(pred) > 0.5).int()
             res = (res == counts).int().sum()
             acc = res.item() / counts.shape[0]
-            print("pred: ", pred)
-            print("counts: ", counts)
-            #print("batch id: {:0>3d}\tacc: {:.3f}".format(batch_id, acc))
+            # print("pred: ", pred)
+            # print("counts: ", counts)
+            print("batch id: {:0>3d}\tacc: {:.3f}".format(batch_id, acc))
 
             #evaluate_results["error"]["mae"] += F.l1_loss(F.relu(pred), counts, reduce="none").sum().item()
             #evaluate_results["error"]["mse"] += F.mse_loss(F.relu(pred), counts, reduce="none").sum().item()
@@ -330,7 +330,7 @@ def evaluate(model, data_type, data_loader, device, config, epoch, logger=None, 
                 logger.info("epoch: {:0>3d}/{:0>3d}\tdata_type: {:<5s}\tbatch: {:0>5d}/{:0>5d}\treg loss: {:0>10.3f}\tbp loss: {:0>16.3f}\tground: {:.3f}\tpredict: {:.3f}".format(
                     epoch, config["epochs"], data_type, batch_id, epoch_step,
                     reg_loss_item, bp_loss_item,
-                    counts[0].item(), pred[0].item()))
+                    counts[0].item(), sigmoid(pred)[0].item()))
         mean_reg_loss = total_reg_loss/total_cnt
         mean_bp_loss = total_bp_loss/total_cnt
         if writer:
