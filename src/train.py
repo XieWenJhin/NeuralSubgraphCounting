@@ -45,10 +45,10 @@ train_config = {
     "gpu_id": -1,
     "num_workers": 48,
     
-    "epochs": 10,
+    "epochs": 200,
     "batch_size": 256,
     "update_every": 1, # actual batch_sizer = batch_size * update_every
-    "print_every": 1,
+    "print_every": 100,
     "init_emb": "Equivariant", # None, Orthogonal, Normal, Equivariant
     "share_emb": True, # sharing embedding requires the same vector length
     "share_arch": True, # sharing architectures
