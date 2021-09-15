@@ -55,12 +55,12 @@ train_config = {
     "dropout": 0.2,
     "dropatt": 0.2,
     
-    "reg_loss": "MSE", # MAE, MSEl
-    "bp_loss": "MSE", # MAE, MSE
+    "reg_loss": "BCE", # MAE, MSEl
+    "bp_loss": "BCE", # MAE, MSE
     "bp_loss_slp": "anneal_cosine$1.0$0.01",    # 0, 0.01, logistic$1.0$0.01, linear$1.0$0.01, cosine$1.0$0.01, 
                                                 # cyclical_logistic$1.0$0.01, cyclical_linear$1.0$0.01, cyclical_cosine$1.0$0.01
                                                 # anneal_logistic$1.0$0.01, anneal_linear$1.0$0.01, anneal_cosine$1.0$0.01
-    "lr": 0.0000001,
+    "lr": 0.00001,
     "weight_decay": 0.00001,
     "max_grad_norm": 8,
 
@@ -139,7 +139,6 @@ def train(model, optimizer, scheduler, data_type, data_loader, device, config, e
     total_bp_loss = 0
     total_cnt = 1e-6
 
-    sigmoid = torch.nn.Sigmoid()
 
     if config["reg_loss"] == "MAE":
         reg_crit = lambda pred, target: F.l1_loss(F.relu(pred), target)
@@ -159,7 +158,7 @@ def train(model, optimizer, scheduler, data_type, data_loader, device, config, e
     elif config["bp_loss"] == "SMSE":
         bp_crit = lambda pred, target, neg_slp: F.smooth_l1_loss(F.leaky_relu(pred, neg_slp), target)
     elif config["reg_loss"] == "BCE":
-        bp_crit = lambda pred, target, neg_slp: F.binary_cross_entropy_with_logits(F.leaky_relu(pred, neg_slp), target)
+        bp_crit = lambda pred, target: F.binary_cross_entropy_with_logits(pred, target)
     else:
         raise NotImplementedError
 
@@ -178,37 +177,43 @@ def train(model, optimizer, scheduler, data_type, data_loader, device, config, e
         pred, pred_ = model(pattern, pattern_len, graph, graph_len, graph_, graph_len_)
 
         #TODO design loss function
-        reg_loss = reg_crit(pred, counts)
-        print(pred)
-        print(counts)
-        print(reg_loss)
+        reg_loss = reg_crit(pred, counts) + reg_crit(pred_, counts_)
+        # print(pred)
+        # print(counts)
+        # print(reg_loss)
         
         if isinstance(config["bp_loss_slp"], (int, float)):
             neg_slp = float(config["bp_loss_slp"])
         else:
             bp_loss_slp, l0, l1 = config["bp_loss_slp"].rsplit("$", 3)
             neg_slp = anneal_fn(bp_loss_slp, batch_id+epoch*epoch_step, T=total_step//4, lambda0=float(l0), lambda1=float(l1))
-        bp_loss = bp_crit(pred, counts, neg_slp)
+        bp_loss = bp_crit(pred, counts) + bp_crit(pred_, counts_)
         
         reg_loss_item = reg_loss.item()
         bp_loss_item = bp_loss.item()
         total_reg_loss += reg_loss_item * cnt
         total_bp_loss += bp_loss_item * cnt
 
-        res, res_ = sigmoid(pred), sigmoid(pred_)
-        res, res_ = (res > 0.5).int(), (res_ > 0.5).int()
-        res, res_ = (res == counts).int().sum(), (res_ ==counts_).int().sum()
-        acc = (res.item() + res_.item()) / (counts.shape[0] + counts_.shape[0])
+        #compute accuracy
+        acc = 0
+        with torch.no_grad():
+            sigmoid = torch.nn.Sigmoid()
+            res, res_ = sigmoid(pred), sigmoid(pred_)
+            res, res_ = (res > 0.5).int(), (res_ > 0.5).int()
+            res, res_ = (res == counts).int().sum(), (res_ == counts_).int().sum()
+            acc = (res.item() + res_.item()) / (counts.shape[0] + counts_.shape[0])
+            print("batch id: {:0>3d}\tacc: {:.3f}".format(batch_id, acc))
 
         if writer:
             writer.add_scalar("%s/REG-%s" % (data_type, config["reg_loss"]), reg_loss_item, epoch*epoch_step+batch_id)
             writer.add_scalar("%s/BP-%s" % (data_type, config["bp_loss"]), bp_loss_item, epoch*epoch_step+batch_id)
 
         if logger and (batch_id % config["print_every"] == 0 or batch_id == epoch_step-1):
-            logger.info("epoch: {:0>3d}/{:0>3d}\tdata_type: {:<5s}\tbatch: {:0>5d}/{:0>5d}\treg loss: {:0>10.3f}\tbp loss: {:0>16.3f}\tground: {:.3f}\tpredict: {:.3f}\tacc: {:.3f}".format(
+            logger.info("epoch: {:0>3d}/{:0>3d}\tdata_type: {:<5s}\tbatch: {:0>5d}/{:0>5d}\treg loss: {:0>10.3f}\tbp loss: {:0>16.3f}\tground: {:.3f}\tpredict: {:.3f}\tground: {:.3f}\tpredict: {:.3f}\tacc: {:.3f}".format(
                 epoch, config["epochs"], data_type, batch_id, epoch_step,
                 reg_loss_item, bp_loss_item,
                 counts[0].item(), sigmoid(pred)[0].item(),
+                counts_[0].item(), sigmoid(pred_)[0].item(),
                 acc))
 
         bp_loss.backward()
@@ -264,7 +269,7 @@ def evaluate(model, data_type, data_loader, device, config, epoch, logger=None, 
     elif config["bp_loss"] == "SMSE":
         bp_crit = lambda pred, target, neg_slp: F.smooth_l1_loss(F.leaky_relu(pred, neg_slp), target)
     elif config["reg_loss"] == "BCE":
-        bp_crit = lambda pred, target, neg_slp: F.binary_cross_entropy_with_logits(F.leaky_relu(pred, neg_slp), target)
+        bp_crit = lambda pred, target: F.binary_cross_entropy_with_logits(pred, target)
     else:
         raise NotImplementedError
 
@@ -294,24 +299,29 @@ def evaluate(model, data_type, data_loader, device, config, epoch, logger=None, 
             evaluate_results["time"]["avg"].extend([avg_t]*cnt)
             evaluate_results["data"]["pred"].extend(pred.cpu().view(-1).tolist())
 
-            reg_loss = reg_crit(pred, counts)
+            reg_loss = reg_crit(pred, counts) + reg_crit(pred_, counts_)
             
             if isinstance(config["bp_loss_slp"], (int, float)):
                 neg_slp = float(config["bp_loss_slp"])
             else:
                 bp_loss_slp, l0, l1 = config["bp_loss_slp"].rsplit("$", 3)
                 neg_slp = anneal_fn(bp_loss_slp, batch_id+epoch*epoch_step, T=total_step//4, lambda0=float(l0), lambda1=float(l1))
-            bp_loss = bp_crit(pred, counts, neg_slp)
+            bp_loss = bp_crit(pred, counts) + bp_crit(pred_, counts_)
             
             reg_loss_item = reg_loss.mean().item()
             bp_loss_item = bp_loss.mean().item()
             total_reg_loss += reg_loss_item * cnt
             total_bp_loss += bp_loss_item * cnt
             
-            res, res_ = sigmoid(pred), sigmoid(pred_)
-            res, res_ = (res > 0.5).int(), (res_ > 0.5).int()
-            res, res_ = (res == counts).int().sum(), (res_ ==counts_).int().sum()
-            acc = (res.item() + res_.item()) / (counts.shape[0] + counts_.shape[0])
+            #compute accuracy
+            acc = 0
+            with torch.no_grad():
+                sigmoid = torch.nn.Sigmoid()
+                res, res_ = sigmoid(pred), sigmoid(pred_)
+                res, res_ = (res > 0.5).int(), (res_ > 0.5).int()
+                res, res_ = (res == counts).int().sum(), (res_ == counts_).int().sum()
+                acc = (res.item() + res_.item()) / (counts.shape[0] + counts_.shape[0])
+                print("batch id: {:0>3d}\tacc: {:.3f}".format(batch_id, acc))
 
             evaluate_results["error"]["mae"] += F.l1_loss(F.relu(pred), counts, reduce="none").sum().item()
             evaluate_results["error"]["mse"] += F.mse_loss(F.relu(pred), counts, reduce="none").sum().item()
@@ -321,10 +331,11 @@ def evaluate(model, data_type, data_loader, device, config, epoch, logger=None, 
                 writer.add_scalar("%s/BP-%s" % (data_type, config["bp_loss"]), bp_loss_item, epoch*epoch_step+batch_id)
 
             if logger and batch_id == epoch_step-1:
-                logger.info("epoch: {:0>3d}/{:0>3d}\tdata_type: {:<5s}\tbatch: {:0>5d}/{:0>5d}\treg loss: {:0>10.3f}\tbp loss: {:0>16.3f}\tground: {:.3f}\tpredict: {:.3f}\tacc: {:.3f}".format(
+                logger.info("epoch: {:0>3d}/{:0>3d}\tdata_type: {:<5s}\tbatch: {:0>5d}/{:0>5d}\treg loss: {:0>10.3f}\tbp loss: {:0>16.3f}\tground: {:.3f}\tpredict: {:.3f}\tground: {:.3f}\tpredict: {:.3f}\tacc: {:.3f}".format(
                     epoch, config["epochs"], data_type, batch_id, epoch_step,
                     reg_loss_item, bp_loss_item,
                     counts[0].item(), sigmoid(pred)[0].item(),
+                    counts_[0].item(), sigmoid(pred_)[0].item(),
                     acc))
         mean_reg_loss = total_reg_loss/total_cnt
         mean_bp_loss = total_bp_loss/total_cnt

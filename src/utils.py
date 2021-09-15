@@ -623,7 +623,7 @@ def extend_graph(attr_name, attr_range, graph, variable_literals, constant_liter
             u, A, c = constant_literal
             A = int(A)
             A_value = graph.vs[i][attr_name[A]]
-            graph.add_edges([(i, o_v_count + add_v_count + A_value)])
+            graph.add_edge(i, o_v_count + add_v_count + A_value)
             i_2_t = graph.get_eid(i, o_v_count + add_v_count + A_value)
             graph.es[i_2_t]["label"] = MAX_E_LABEL_VALUE + 1 + A
 
