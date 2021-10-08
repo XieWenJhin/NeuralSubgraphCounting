@@ -13,6 +13,7 @@ from multiprocessing import Pool
 from tqdm import tqdm
 import random
 import sys
+import time
 
 def _get_subdirs(dirpath, leaf_only=True):
     subdirs = list()
@@ -273,9 +274,6 @@ def process_pattern(p, new_pattern_dir, pattern, attr_num, attr_range, constants
     return variable_literals, constant_literals
 
 def process_graph(p, g, new_pattern_dir, new_graph_dir, new_metadata_dir, variable_literals, constant_literals, graph, meta, attr_num, attr_range, constants, variables):
-    pid = os.getpid()
-    print("process id: ", pid)
-    
     #generate attributes for graph
     counts = 0
     for i in range(attr_num):
@@ -362,7 +360,7 @@ def process_graph(p, g, new_pattern_dir, new_graph_dir, new_metadata_dir, variab
     
     with open(os.path.join(new_metadata_dir,p ,g + ".meta"), "w") as f:
         json.dump({"counts": counts, "subisomorphisms": literal_isos}, f)
-    
+    return g
     # with open(os.path.join(new_metadata_dir + "_fixed",p ,g +'.meta'), "w") as f:
     #     json.dump({"counts": fixed_counts, "subisomorphisms": fixed_isos, "mapping": mapping}, f)
     
@@ -379,18 +377,21 @@ def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, n
     for p, pattern in patterns.items():
         if p in graphs:
             variable_literals, constant_literals = process_pattern(p, new_pattern_dir, pattern, attr_num, attr_range, constants, variables)
-            #pool = Pool(num_workers if num_workers > 0 else os.cpu_count())
-            for g, graph in graphs[p].items():
-                process_graph(p, g, new_pattern_dir, new_graph_dir, new_metadata_dir, variable_literals, constant_literals, graph, meta[p][g], attr_num, attr_range, constants, variables)
-                #pool.apply_async(process_g, args=(p, g, new_pattern_dir, new_graph_dir, new_metadata_dir, variable_literals, constant_literals, graph, meta[p][g], attr_num, attr_range, constants, variables, ))
-
+            with Pool(num_workers if num_workers > 0 else os.cpu_count()) as pool:
+                res = list()
+                for g, graph in graphs[p].items():
+                    print(p)
+                    #process_graph(p, g, new_pattern_dir, new_graph_dir, new_metadata_dir, variable_literals, constant_literals, graph, meta[p][g], attr_num, attr_range, constants, variables)
+                    res.append(pool.apply_async(process_graph, args=(p, g, new_pattern_dir, new_graph_dir, new_metadata_dir, variable_literals, constant_literals, graph, meta[p][g], attr_num, attr_range, constants, variables, )))
+                for r in res:
+                    print(r.get())
                
 
 
 config = {
-    "pattern_dir": "../data/small_part/patterns",
-    "graph_dir": "../data/small_part/graphs",
-    "meta_dir": "../data/small_part/metadata",
+    "pattern_dir": "../data/small_part_larger/patterns",
+    "graph_dir": "../data/small_part_larger/graphs",
+    "meta_dir": "../data/small_part_larger/metadata",
     "new_pattern_dir": "../data/small_stage_1/patterns",
     "new_graph_dir": "../data/small_stage_1/graphs",
     "new_meta_dir": "../data/small_stage_1/metadata",
