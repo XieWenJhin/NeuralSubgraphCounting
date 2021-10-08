@@ -288,6 +288,7 @@ def process_graph(p, g, new_pattern_dir, new_graph_dir, new_metadata_dir, variab
     #if has match, process matchs and compute counts
     literal_isos = list() 
     if meta["counts"] != 0:
+        union = set() #避免多次修改同一节点同一属性值造成冲突
         for subisomorphism in meta["subisomorphisms"]:
             satisfied = True
             #check variable literals
@@ -308,46 +309,47 @@ def process_graph(p, g, new_pattern_dir, new_graph_dir, new_metadata_dir, variab
             if satisfied:
                 counts += 1
                 literal_isos.append(subisomorphism)
-                print("already")
-                print(subisomorphism)
-            elif random.random() > 0.5:#多个匹配包含相同的节点，根据规则修改属性值会产生冲突
+                union |= set(subisomorphism)
+            elif random.random() > 0.5: #多个匹配包含相同的节点，根据规则修改属性值会产生冲突
+                satisfied = True
                 for literal in variable_literals:
                     x, A, y, B = literal
                     x_2_g = subisomorphism[x]
                     y_2_g = subisomorphism[y]
+                    if x_2_g in union or y_2_g in union:
+                        satisfied = False
+                        break
                     #graph.vs[x_2_g][attr_name[A]] = graph.vs[y_2_g][attr_name[B]] = random.randint(0, min(attr_range[A], attr_range[B]))
-                    #check x.A = y.B x.A = c consistency
+                    #check x.A == y.B x.A == c consistency
                     for l in constant_literals:
                         if (x == l[0] and A == l[1]) or (y == l[0] and B == l[1]):
                             graph.vs[x_2_g][attr_name[A]] = graph.vs[y_2_g][attr_name[B]] = l[2]
-                            print("f1")
                             break
-                    #check x.A = y.A, y.A = z.A consistency
-                    exist = False
+                    #check x.A == y.A, y.A == z.A consistency
+                    #exist = False
                     for literal in variable_literals:
                         x_, A_, y_, B_ = literal
                         if (x == x_ and A == A_) or (x == y_ and A == B_):# x.A exist
                             graph.vs[y_2_g][attr_name[B]] = graph.vs[x_2_g][attr_name[A]]
-                            print(graph.vs[y_2_g][attr_name[B]])
-                            print(graph.vs[x_2_g][attr_name[A]])
-                            exist = True
+                            #exist = True
                             break
                         elif (y == x_ and B == A_) or (y == y_ and B == B_):# y.B exist
                             graph.vs[x_2_g][attr_name[A]] = graph.vs[y_2_g][attr_name[B]]
-                            print("f3")
-                            exist = True
+                            #exist = True
                             break
-                    if(not exist):
-                        print("f4")
-                        graph.vs[x_2_g][attr_name[A]] = graph.vs[y_2_g][attr_name[B]] = random.randint(0, min(attr_range[A], attr_range[B]))
+                    # if(not exist):
+                    #     graph.vs[x_2_g][attr_name[A]] = graph.vs[y_2_g][attr_name[B]] = random.randint(0, min(attr_range[A], attr_range[B]))
                 for literal in constant_literals:
                     x, A, c = literal
                     x_2_g = subisomorphism[x]
+                    if x_2_g in union:
+                        satisfied = False
+                        break
                     graph.vs[x_2_g][attr_name[A]] = c
-                counts += 1
-                literal_isos.append(subisomorphism)
-                print("make")
-                print(subisomorphism)
+                if satisfied:
+                    counts += 1
+                    literal_isos.append(subisomorphism)
+                    union |= set(subisomorphism)
     #fixed a pair of vertices, and judge if has matches
     #fixed_counts, mapping, fixed_isos = set_fixed_vertices(pattern, graph, literal_isos)
     #write to new data file
