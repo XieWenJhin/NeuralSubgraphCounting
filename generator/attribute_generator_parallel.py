@@ -238,19 +238,18 @@ def process_pattern(p, new_pattern_dir, pattern, attr_num, attr_range, constants
         #chose two attributes, allow A == B
         A = random.randint(0, attr_num - 1)
         B = random.randint(0, attr_num - 1)
-        variable_literals.append([x, A, y, B])
         #literal is x.A == y.B
-        #check consistency
-        exist = false
+        #check x.A == y.A, y.A == z.A consistency
+        exist = False
         for literal in variable_literals:
             x_, A_, y_, B_ = literal
             if (x == x_ and A == A_) or (x == y_ and A == B_):# x.A exist
                 pattern.vs[y][attr_name[B]] = pattern.vs[x][attr_name[A]]
-                exist = true
+                exist = True
                 break
             elif (y == x_ and B == A_) or (y == y_ and B == B_):# y.B exist
                 pattern.vs[x][attr_name[A]] = pattern.vs[y][attr_name[B]]
-                exist = true
+                exist = True
                 break
         if(not exist):
             pattern.vs[x][attr_name[A]] = pattern.vs[y][attr_name[B]] = random.randint(0, min(attr_range[A], attr_range[B]))
@@ -273,7 +272,7 @@ def process_pattern(p, new_pattern_dir, pattern, attr_num, attr_range, constants
     
     return variable_literals, constant_literals
 
-def process_g(p, g, new_pattern_dir, new_graph_dir, new_metadata_dir, variable_literals, constant_literals, graph, meta, attr_num, attr_range, constants, variables):
+def process_graph(p, g, new_pattern_dir, new_graph_dir, new_metadata_dir, variable_literals, constant_literals, graph, meta, attr_num, attr_range, constants, variables):
     pid = os.getpid()
     print("process id: ", pid)
     
@@ -309,30 +308,52 @@ def process_g(p, g, new_pattern_dir, new_graph_dir, new_metadata_dir, variable_l
             if satisfied:
                 counts += 1
                 literal_isos.append(subisomorphism)
-            elif random.random() > 0.7:
+                print("already")
+                print(subisomorphism)
+            elif random.random() > 0.5:#多个匹配包含相同的节点，根据规则修改属性值会产生冲突
                 for literal in variable_literals:
                     x, A, y, B = literal
                     x_2_g = subisomorphism[x]
                     y_2_g = subisomorphism[y]
-                    graph.vs[x_2_g][attr_name[A]] = graph.vs[y_2_g][attr_name[B]] = random.randint(0, min(attr_range[A], attr_range[B]))
-                    #resolve literals confict
+                    #graph.vs[x_2_g][attr_name[A]] = graph.vs[y_2_g][attr_name[B]] = random.randint(0, min(attr_range[A], attr_range[B]))
+                    #check x.A = y.B x.A = c consistency
                     for l in constant_literals:
                         if (x == l[0] and A == l[1]) or (y == l[0] and B == l[1]):
-                            graph.vs[x_2_g][attr_name[A]] = graph.vs[y_2_g][attr_name[B]] = c
+                            graph.vs[x_2_g][attr_name[A]] = graph.vs[y_2_g][attr_name[B]] = l[2]
+                            print("f1")
                             break
-
+                    #check x.A = y.A, y.A = z.A consistency
+                    exist = False
+                    for literal in variable_literals:
+                        x_, A_, y_, B_ = literal
+                        if (x == x_ and A == A_) or (x == y_ and A == B_):# x.A exist
+                            graph.vs[y_2_g][attr_name[B]] = graph.vs[x_2_g][attr_name[A]]
+                            print(graph.vs[y_2_g][attr_name[B]])
+                            print(graph.vs[x_2_g][attr_name[A]])
+                            exist = True
+                            break
+                        elif (y == x_ and B == A_) or (y == y_ and B == B_):# y.B exist
+                            graph.vs[x_2_g][attr_name[A]] = graph.vs[y_2_g][attr_name[B]]
+                            print("f3")
+                            exist = True
+                            break
+                    if(not exist):
+                        print("f4")
+                        graph.vs[x_2_g][attr_name[A]] = graph.vs[y_2_g][attr_name[B]] = random.randint(0, min(attr_range[A], attr_range[B]))
                 for literal in constant_literals:
                     x, A, c = literal
                     x_2_g = subisomorphism[x]
                     graph.vs[x_2_g][attr_name[A]] = c
                 counts += 1
                 literal_isos.append(subisomorphism)
+                print("make")
+                print(subisomorphism)
     #fixed a pair of vertices, and judge if has matches
     #fixed_counts, mapping, fixed_isos = set_fixed_vertices(pattern, graph, literal_isos)
     #write to new data file
     os.makedirs(os.path.join(new_graph_dir, p), exist_ok=True)
     os.makedirs(os.path.join(new_metadata_dir, p), exist_ok=True)
-    os.makedirs(os.path.join(new_metadata_dir + "_fixed", p), exist_ok=True)
+    #os.makedirs(os.path.join(new_metadata_dir + "_fixed", p), exist_ok=True)
     
     #pattern.write(os.path.join(new_pattern_dir, p + ".gml"))
     graph.write(os.path.join(new_graph_dir, p, g + ".gml"))
@@ -340,8 +361,8 @@ def process_g(p, g, new_pattern_dir, new_graph_dir, new_metadata_dir, variable_l
     with open(os.path.join(new_metadata_dir,p ,g + ".meta"), "w") as f:
         json.dump({"counts": counts, "subisomorphisms": literal_isos}, f)
     
-    with open(os.path.join(new_metadata_dir + "_fixed",p ,g +'.meta'), "w") as f:
-        json.dump({"counts": fixed_counts, "subisomorphisms": fixed_isos, "mapping": mapping}, f)
+    # with open(os.path.join(new_metadata_dir + "_fixed",p ,g +'.meta'), "w") as f:
+    #     json.dump({"counts": fixed_counts, "subisomorphisms": fixed_isos, "mapping": mapping}, f)
     
     # with open(os.path.join(new_pattern_dir, p + ".literals"), "w") as f:
     #     json.dump({"constant literals": constant_literals, "variable literals": variable_literals} , f)
@@ -355,18 +376,19 @@ def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, n
     os.makedirs(new_pattern_dir, exist_ok=True)
     for p, pattern in patterns.items():
         if p in graphs:
-            variable_literals, constant_literals = process_p(p, new_pattern_dir, pattern, attr_num, attr_range, constants, variables)
-            pool = Pool(num_workers if num_workers > 0 else os.cpu_count())
+            variable_literals, constant_literals = process_pattern(p, new_pattern_dir, pattern, attr_num, attr_range, constants, variables)
+            #pool = Pool(num_workers if num_workers > 0 else os.cpu_count())
             for g, graph in graphs[p].items():
-                pool.apply_async(process, args=(p, g, new_pattern_dir, new_graph_dir, new_metadata_dir, variable_literals, constant_literals, graph, meta[p][g], attr_num, attr_range, constants, variables))
+                process_graph(p, g, new_pattern_dir, new_graph_dir, new_metadata_dir, variable_literals, constant_literals, graph, meta[p][g], attr_num, attr_range, constants, variables)
+                #pool.apply_async(process_g, args=(p, g, new_pattern_dir, new_graph_dir, new_metadata_dir, variable_literals, constant_literals, graph, meta[p][g], attr_num, attr_range, constants, variables, ))
 
                
 
 
 config = {
-    "pattern_dir": "../data/small/patterns",
-    "graph_dir": "../data/small/graphs",
-    "meta_dir": "../data/small/metadata",
+    "pattern_dir": "../data/small_part/patterns",
+    "graph_dir": "../data/small_part/graphs",
+    "meta_dir": "../data/small_part/metadata",
     "new_pattern_dir": "../data/small_stage_1/patterns",
     "new_graph_dir": "../data/small_stage_1/graphs",
     "new_meta_dir": "../data/small_stage_1/metadata",
