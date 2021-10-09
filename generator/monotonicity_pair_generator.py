@@ -29,7 +29,6 @@ def _get_subdirs(dirpath, leaf_only=True):
 def _read_graphs_from_dir(dirpath):
     import igraph as ig
     graphs = dict()
-    print("read by ", os.getpid())
     for filename in os.listdir(dirpath):
         if not os.path.isdir(os.path.join(dirpath, filename)):
             names = os.path.splitext(os.path.basename(filename))
@@ -102,7 +101,69 @@ def read_metadata_from_dir(dirpath, num_workers=4):
             meta[os.path.basename(subdir)] = x
     return meta
 
-def generate(pattern_dir, graph_dir, meta_dir,num_workers=0):
+def generate_graph(p, g, new_graph_dir, new_meta_dir, pattern, graph, meta):
+    #print("process {:d} start".format(os.getpid()))
+    MAX_E_LABEL_VALUE = max(graph.es["label"])
+    counts = -1
+    if meta["counts"] == 0:
+        g_v_count = graph.vcount()
+        u = random.randint(0, g_v_count - 1)
+        v = random.randint(0, g_v_count - 1)
+        # guarantee u != v
+        while u == v:
+            v = random.randint(0, g_v_count - 1)
+        graph.add_edge(u, v)
+        #print("add edge ", u, v)
+        eid = graph.get_eid(u, v)
+        graph.es[eid]["label"] = random.randint(0, MAX_E_LABEL_VALUE)
+        counts = 0
+    elif random.random() > 0.5:
+        m1, m2 = meta["mapping"]
+        p_v, g_v = m1
+        p_u, g_u = m2
+        for subisomorphism in meta["subisomorphisms"]:
+            if g_v in subisomorphism and g_u in subisomorphism: #actually after ahchor this is always True
+                if pattern.get_eid(p_v, p_u, error=False) != -1:
+                    eid = graph.get_eid(g_v, g_u, error=False)
+                    if eid != -1:
+                        graph.delete_edges(eid)
+                        #print("incoming graph delete ", g_v, g_u)
+                        break
+                elif pattern.get_eid(p_u, p_v, error=False) != -1:
+                    eid = graph.get_eid(g_u, g_v, error=False)
+                    if eid != -1:
+                        graph.delete_edges(eid)
+                        #print("outgoing graph delete ", g_u, g_v)
+                        break
+                else:
+                    p_edges = pattern.get_edgelist()
+                    index = random.randint(0, len(p_edges) - 1)
+                    p_x, p_y = p_edges[index]
+                    g_x, g_y = subisomorphism[p_x], subisomorphism[p_y] 
+                    eid = graph.get_eid(g_x, g_y, error=False)
+                    if eid != -1:
+                        graph.delete_edges(eid)
+                        #print("graph random delete ", g_x, g_y)
+        counts = 0
+    else:
+        g_v_count = graph.vcount()
+        u = random.randint(0, g_v_count - 1)
+        v = random.randint(0, g_v_count - 1)
+        # guarantee u != v
+        while u == v:
+            v = random.randint(0, g_v_count - 1)
+        graph.add_edge(u, v)
+        #print("add edge ", u, v)
+        eid = graph.get_eid(u, v)
+        graph.es[eid]["label"] = random.randint(0, MAX_E_LABEL_VALUE)
+        counts = 1
+    graph.write(os.path.join(new_graph_dir, p, g + ".gml"))
+    with open(os.path.join(new_meta_dir, p, g + ".meta"), "w") as f:
+        json.dump({"counts": counts, "subisomorphisms": meta["subisomorphisms"], "mapping": meta["mapping"]}, f)
+    #print("process {:d} end".format(os.getpid()))
+    return g
+
+def generate(pattern_dir, graph_dir, meta_dir,num_workers=48):
     patterns = read_patterns_from_dir(pattern_dir, num_workers=num_workers)
     graphs = read_graphs_from_dir(graph_dir, num_workers=num_workers)
     meta = read_metadata_from_dir(meta_dir, num_workers=num_workers)
@@ -111,62 +172,21 @@ def generate(pattern_dir, graph_dir, meta_dir,num_workers=0):
     new_meta_dir = meta_dir + "_"
     
     for p, pattern in patterns.items():
-        os.makedirs(os.path.join(new_graph_dir, p), exist_ok=True)
-        os.makedirs(os.path.join(new_meta_dir, p), exist_ok=True)
-        for g, graph in graphs[p].items():
-            MAX_E_LABEL_VALUE = max(graph.es["label"])
-            counts = -1
-            if meta[p][g]["counts"] == 0:
-                g_v_count = graph.vcount()
-                u = random.randint(0, g_v_count - 1)
-                v = random.randint(0, g_v_count - 1)
-                # guarantee u != v
-                while u == v:
-                    v = random.randint(0, g_v_count - 1)
-                graph.add_edge(u, v)
-                eid = graph.get_eid(u, v)
-                graph.es[eid]["label"] = random.randint(0, MAX_E_LABEL_VALUE)
-                counts = 0
-            elif random.random() > 0.5:
-                m1, m2 = meta[p][g]["mapping"]
-                p_v, g_v = m1
-                p_u, g_u = m2
-                for subisomorphism in meta[p][g]["subisomorphisms"]:
-                    if g_v in subisomorphism and g_u in subisomorphism:
-                        if pattern.get_eid(p_v, p_u, error=False) != -1:
-                            eid = pattern.get_eid(p_v, p_u, error=False)
-                            g_x, g_y = subisomorphism[p_v], subisomorphism[p_u]
-                            graph.delete_edges(eid)
-                            break
-                        else:
-                            p_edges = pattern.get_edgelist()
-                            index = random.randint(0, len(p_edges) - 1)
-                            p_x, p_y = p_edges[index]
-                            g_x, g_y = subisomorphism[p_x], subisomorphism[p_y] 
-                            eid = graph.get_eid(g_x, g_y, error=False)
-                            if eid != -1:
-                                graph.delete_edges(eid)
-                counts = 0
-            else:
-                g_v_count = graph.vcount()
-                u = random.randint(0, g_v_count - 1)
-                v = random.randint(0, g_v_count - 1)
-                # guarantee u != v
-                while u == v:
-                    v = random.randint(0, g_v_count - 1)
-                graph.add_edge(u, v)
-                eid = graph.get_eid(u, v)
-                graph.es[eid]["label"] = random.randint(0, MAX_E_LABEL_VALUE)
-                counts = 1
-            graph.write(os.path.join(new_graph_dir, p, g + ".gml"))
-            with open(os.path.join(new_meta_dir, p, g + ".meta"), "w") as f:
-                json.dump({"counts": counts, "subisomorphisms": meta[p][g]["subisomorphisms"], "mapping": meta[p][g]["mapping"]}, f)
+        with Pool(num_workers if num_workers > 0 else os.cpu_count()) as pool:
+            os.makedirs(os.path.join(new_graph_dir, p), exist_ok=True)
+            os.makedirs(os.path.join(new_meta_dir, p), exist_ok=True)
+            res = list()
+            for g, graph in graphs[p].items():
+                #generate_graph(p, g, new_graph_dir, new_meta_dir, pattern, graph, meta[p][g])
+                res.append(pool.apply_async(generate_graph, args=(p, g, new_graph_dir, new_meta_dir, pattern, graph, meta[p][g],)))
+            for r in res:
+                r.get()
 
                     
 config = {
-    "pattern_dir": "../data/small_stage_1/patterns",
-    "graph_dir": "../data/small_stage_1/graphs",
-    "meta_dir": "../data/small_stage_1/metadata_fixed"
+    "pattern_dir": "../data/small_new/patterns",
+    "graph_dir": "../data/small_new/graphs",
+    "meta_dir": "../data/small_new/metadata_fixed"
 }
 
 if __name__ == "__main__":
