@@ -101,6 +101,16 @@ def read_metadata_from_dir(dirpath, num_workers=4):
             meta[os.path.basename(subdir)] = x
     return meta
 
+def count_origin(meta_dir, num_workers=48):
+    meta = read_metadata_from_dir(meta_dir, num_workers=num_workers)
+    count = 0
+    num = 0
+    for p, x in meta.items():
+        for g, y in x.items():
+            if y["counts"] > 0:
+                count += 1
+            num += 1
+    print("meta_dir\tcount: {:d}\tnum: {:d}\tPos: {:.3f}".format(count, num, count/num))
 
 def statistic(pattern_dir, graph_dir, meta_dir,num_workers=48):
     meta = read_metadata_from_dir(meta_dir, num_workers=num_workers)
@@ -124,9 +134,9 @@ def statistic(pattern_dir, graph_dir, meta_dir,num_workers=48):
     print("count: {:d}\tnum: {:d}\tPos: {:.3f}\tcount_: {:d}\tnum_: {:d}\tPos_: {:.3f}".format(count, num, count/num, count_, num_, count_/num_))
                     
 config = {
-    "pattern_dir": "../data/small_new/patterns",
-    "graph_dir": "../data/small_new/graphs",
-    "meta_dir": "../data/small_new/metadata_fixed"
+    "pattern_dir": "../data/small_alphas_0.8/patterns",
+    "graph_dir": "../data/small_alphas_0.8/graphs",
+    "meta_dir": "../data/small_alphas_0.8/metadata_fixed"
 }
 
 if __name__ == "__main__":
@@ -147,3 +157,5 @@ if __name__ == "__main__":
         except:
             pass
     statistic(config["pattern_dir"], config["graph_dir"], config["meta_dir"])
+    #count_origin("../data/small/metadata")
+    #count_origin("../data/small_alphas/metadata")

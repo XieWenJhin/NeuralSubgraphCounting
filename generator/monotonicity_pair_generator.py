@@ -184,9 +184,9 @@ def generate(pattern_dir, graph_dir, meta_dir,num_workers=48):
 
                     
 config = {
-    "pattern_dir": "../data/small_new/patterns",
-    "graph_dir": "../data/small_new/graphs",
-    "meta_dir": "../data/small_new/metadata_fixed"
+    "pattern_dir": "../data/small_alphas_0.8/patterns",
+    "graph_dir": "../data/small_alphas_0.8/graphs",
+    "meta_dir": "../data/small_alphas_0.8/metadata_fixed"
 }
 
 if __name__ == "__main__":

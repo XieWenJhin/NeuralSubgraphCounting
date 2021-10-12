@@ -126,7 +126,7 @@ def set_fixed_vertices(pattern, graph, subisomorphisms):
         return counts, mapping, fixed_isos
     else:
         #select corresponding vertices from isomorphisms
-        if random.random() >= 0.5:
+        if random.random() >= 0.2:
             counts = 1
             index = random.randint(0, len(subisomorphisms) - 1)
             ul = subisomorphisms[index][u]
@@ -309,7 +309,7 @@ def process_graph(p, g, new_pattern_dir, new_graph_dir, new_metadata_dir, variab
                 counts += 1
                 literal_isos.append(subisomorphism)
                 union |= set(subisomorphism)
-            elif random.random() > 0.5: #多个匹配包含相同的节点，根据规则修改属性值会产生冲突
+            elif random.random() > 0.2: #多个匹配包含相同的节点，根据规则修改属性值会产生冲突
                 satisfied = True
                 for literal in variable_literals:
                     x, A, y, B = literal
@@ -390,12 +390,12 @@ def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, n
 
 
 config = {
-    "pattern_dir": "../data/small_part/patterns",
-    "graph_dir": "../data/small_part/graphs",
-    "meta_dir": "../data/small_part/metadata",
-    "new_pattern_dir": "../data/small_stage_1/patterns",
-    "new_graph_dir": "../data/small_stage_1/graphs",
-    "new_meta_dir": "../data/small_stage_1/metadata",
+    "pattern_dir": "../data/small_alphas/patterns",
+    "graph_dir": "../data/small_alphas/graphs",
+    "meta_dir": "../data/small_alphas/metadata",
+    "new_pattern_dir": "../data/small_alphas_0.8/patterns",
+    "new_graph_dir": "../data/small_alphas_0.8/graphs",
+    "new_meta_dir": "../data/small_alphas_0.8/metadata",
     "attr_num": 5,
     "attr_range": "8,8,8,8,8",
     "constants": 1,

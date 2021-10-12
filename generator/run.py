@@ -39,7 +39,7 @@ DEBUG_CONFIG = {
 SMALL_CONFIG = {
     "max_subgraph": 512,
 
-    "alphas": [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8],
+    "alphas": [0.4, 0.5, 0.6, 0.7, 0.8, 0.8, 0.8],
 
     "number_of_patterns": 3,
     "number_of_pattern_vertices": [3, 4, 8],
@@ -56,14 +56,14 @@ SMALL_CONFIG = {
     "max_ratio_of_edges_vertices": 4,
     "max_pattern_counts": 1024,
 
-    "save_data_dir": r"/data/xliucr/SubIsoCnt/small",
-    "num_workers": 16
+    "save_data_dir": r"../data/small_alphas",
+    "num_workers": 48
 }
 
 LARGE_CONFIG = {
     "max_subgraph": 512,
 
-    "alphas": [0.15, 0.2, 0.25],
+    "alphas": [0.1, 0.2, 0.3],
     
     "number_of_patterns": 2,
     "number_of_pattern_vertices": [3, 4, 8, 16],
@@ -80,8 +80,8 @@ LARGE_CONFIG = {
     "max_ratio_of_edges_vertices": 4,
     "max_pattern_counts": 4096,
 
-    "save_data_dir": r"../data/large",
-    "num_workers": 32
+    "save_data_dir": r"../data/large_alphas",
+    "num_workers": 48
 }
 
 CONFIG = LARGE_CONFIG
