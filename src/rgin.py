@@ -75,9 +75,8 @@ class RGIN(GraphAdjModel):
         if self.add_degree:
             p_dim += 1
             g_dim += 1
-        if self.fix_vertices:
-            p_dim += 8
-            g_dim += 8
+        self.fc1 = nn.Linear(p_dim * 2 + g_dim * 2, config["predict_net_hidden_dim"])
+        self.fc2 = nn.Linear(config["predict_net_hidden_dim"], 1)
         self.predict_net = self.create_predict_net(config["predict_net"],
             pattern_dim=p_dim, graph_dim=g_dim, hidden_dim=config["predict_net_hidden_dim"],
             num_heads=config["predict_net_num_heads"], recurrent_steps=config["predict_net_recurrent_steps"], 
@@ -226,12 +225,12 @@ class RGIN(GraphAdjModel):
             if zero_mask is not None:
                 graph_output.masked_fill_(zero_mask, 0.0)
         
-        if self.add_enc and self.add_degree and self.fix_vertices:
+        if self.add_enc and self.add_degree:
             pattern_enc, graph_enc = self.get_enc(pattern, pattern_len, graph, graph_len)
             if zero_mask is not None:
                 graph_enc.masked_fill_(zero_mask, 0.0)
-            pattern_output = torch.cat([pattern_enc, pattern.ndata["w"], pattern_output, pattern.ndata["indeg"].unsqueeze(-1)], dim=1)
-            graph_output = torch.cat([graph_enc,graph.ndata["w"], graph_output, graph.ndata["indeg"].unsqueeze(-1)], dim=1)
+            pattern_output = torch.cat([pattern_enc, pattern_output, pattern.ndata["indeg"].unsqueeze(-1)], dim=1)
+            graph_output = torch.cat([graph_enc, graph_output, graph.ndata["indeg"].unsqueeze(-1)], dim=1)
         elif self.add_enc:
             pattern_enc, graph_enc = self.get_enc(pattern, pattern_len, graph, graph_len)
             if zero_mask is not None:
@@ -242,9 +241,9 @@ class RGIN(GraphAdjModel):
             pattern_output = torch.cat([pattern_output, pattern.ndata["indeg"].unsqueeze(-1)], dim=1)
             graph_output = torch.cat([graph_output, graph.ndata["indeg"].unsqueeze(-1)], dim=1)
 
-        
-        pred = self.predict_net(
-            split_and_batchify_graph_feats(pattern_output, pattern_len)[0], pattern_len, 
-            split_and_batchify_graph_feats(graph_output, graph_len)[0], graph_len)
+        p_u_emb, p_v_emb = pattern_output[(pattern.ndata["w"] == 1)[:,0],], pattern_output[(pattern.ndata["w"] == 2)[:,0],]
+        g_u_emb, g_v_emb = pattern_output[(graph.ndata["w"] == 1)[:,0],], pattern_output[(graph.ndata["w"] == 2)[:,0],]
+        y = F.relu(self.fc1(torch.cat([p_u_emb, p_v_emb, g_u_emb, g_v_emb], dim=1)))
+        pred = self.fc2(y)
         
         return pred

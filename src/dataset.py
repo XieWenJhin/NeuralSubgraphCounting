@@ -338,7 +338,7 @@ class GraphAdjDataset(data.Dataset):
         u1, v1 = mapping[0][1], mapping[1][1]
         pattern_weights = torch.zeros(pattern_dglgraph.number_of_nodes(), 8)
         pattern_weights[u,] = 1
-        pattern_weights[v,] = 1
+        pattern_weights[v,] = 2
         pattern_dglgraph.ndata["w"] = pattern_weights
 
 
@@ -382,7 +382,7 @@ class GraphAdjDataset(data.Dataset):
         #fix pair vertices on graph
         graph_weights = torch.zeros(graph_dglgraph.number_of_nodes(), 8)
         graph_weights[u1,] = 1
-        graph_weights[v1,] = 1
+        graph_weights[v1,] = 2
         graph_dglgraph.ndata["w"] = graph_weights
 
         subisomorphisms = np.array(x["subisomorphisms"], dtype=np.int32).reshape(-1, x["pattern"].vcount())
