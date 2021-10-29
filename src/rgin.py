@@ -241,22 +241,11 @@ class RGIN(GraphAdjModel):
             pattern_output = torch.cat([pattern_output, pattern.ndata["indeg"].unsqueeze(-1)], dim=1)
             graph_output = torch.cat([graph_output, graph.ndata["indeg"].unsqueeze(-1)], dim=1)
 
-        print(pattern_output.shape)
-        print(graph_output.shape)
-        print(pattern.ndata["w"].shape)
-        print(graph.ndata["w"].shape)
-        print(pattern.ndata["w"] == 1)
-        print(pattern.ndata["w"] == 2)
         p_u_emb = pattern_output[(pattern.ndata["w"] == 1)[:,0],]
         p_v_emb = pattern_output[(pattern.ndata["w"] == 2)[:,0],]
         g_u_emb = graph_output[((graph.ndata["w"] == 1) + (graph.ndata["w"] == 3))[:,0],]
         g_v_emb = graph_output[((graph.ndata["w"] == 2) + (graph.ndata["w"] == 3))[:,0],]
-        print(pattern.batch_size)
-        print(graph.batch_size)
-        print(p_u_emb.shape)
-        print(p_v_emb.shape)
-        print(g_u_emb.shape)
-        print(g_v_emb.shape)
+        
         y = F.relu(self.fc1(torch.cat([p_u_emb, p_v_emb, g_u_emb, g_v_emb], dim=1)))
         pred = self.fc2(y)
         
