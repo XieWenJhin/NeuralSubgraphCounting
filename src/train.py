@@ -194,14 +194,23 @@ def train(model, optimizer, scheduler, data_type, data_loader, device, config, e
         total_reg_loss += reg_loss_item * cnt
         total_bp_loss += bp_loss_item * cnt
 
+        #evaluate
         sigmoid = torch.nn.Sigmoid()
         res = (sigmoid(pred) > 0.5).int()
-        res = (res == counts).int().sum()
-        acc = res.item() / counts.shape[0]
+        P = counts.sum()
+        N = count.shape[0] - P
+        TP = count(res == counts).int().sum()
+        FP = N - TN
+        TN = (res == counts).int().sum() - TP
+        FN = P - TP
+        acc = TP + TN / counts.shape[0]
+        precision = TP / (TP + FP)
+        recall = TP / P
+        F1 = 2 * precision * recall / (precision + recall)
         #print(ids)
         #print("pred: ", pred)
         #print("counts: ", counts)
-        print("batch id: {:0>3d}\tacc: {:.3f}".format(batch_id, acc))
+        print("batch id: {:0>3d}\tacc: {:.3f}\tprecision: {:.3f}\trecall: {:.3f}\tF1: {:.3f}".format(batch_id, acc, precision, recall, F1))
         
         if writer:
             writer.add_scalar("%s/REG-%s" % (data_type, config["reg_loss"]), reg_loss_item, epoch*epoch_step+batch_id)
@@ -312,13 +321,23 @@ def evaluate(model, data_type, data_loader, device, config, epoch, logger=None, 
             total_reg_loss += reg_loss_item * cnt
             total_bp_loss += bp_loss_item * cnt
             
+            #evaluate
             sigmoid = torch.nn.Sigmoid()
             res = (sigmoid(pred) > 0.5).int()
-            res = (res == counts).int().sum()
-            acc = res.item() / counts.shape[0]
-            # print("pred: ", pred)
-            # print("counts: ", counts)
-            print("batch id: {:0>3d}\tacc: {:.3f}".format(batch_id, acc))
+            P = counts.sum()
+            N = count.shape[0] - P
+            TP = count(res == counts).int().sum()
+            FP = N - TN
+            TN = (res == counts).int().sum() - TP
+            FN = P - TP
+            acc = TP + TN / counts.shape[0]
+            precision = TP / (TP + FP)
+            recall = TP / P
+            F1 = 2 * precision * recall / (precision + recall)
+            #print(ids)
+            #print("pred: ", pred)
+            #print("counts: ", counts)
+            print("batch id: {:0>3d}\tacc: {:.3f}\tprecision: {:.3f}\trecall: {:.3f}\tF1: {:.3f}".format(batch_id, acc, precision, recall, F1))
 
             #evaluate_results["error"]["mae"] += F.l1_loss(F.relu(pred), counts, reduce="none").sum().item()
             #evaluate_results["error"]["mse"] += F.mse_loss(F.relu(pred), counts, reduce="none").sum().item()
