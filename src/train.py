@@ -198,12 +198,12 @@ def train(model, optimizer, scheduler, data_type, data_loader, device, config, e
         sigmoid = torch.nn.Sigmoid()
         res = (sigmoid(pred) > 0.5).int()
         P = counts.sum()
-        N = count.shape[0] - P
-        TP = count(res == counts).int().sum()
-        FP = N - TN
+        N = counts.shape[0] - P
+        TP = counts[res == counts].sum()
         TN = (res == counts).int().sum() - TP
+        FP = N - TN
         FN = P - TP
-        acc = TP + TN / counts.shape[0]
+        acc = (TP + TN) / counts.shape[0]
         precision = TP / (TP + FP)
         recall = TP / P
         F1 = 2 * precision * recall / (precision + recall)
@@ -325,12 +325,12 @@ def evaluate(model, data_type, data_loader, device, config, epoch, logger=None, 
             sigmoid = torch.nn.Sigmoid()
             res = (sigmoid(pred) > 0.5).int()
             P = counts.sum()
-            N = count.shape[0] - P
-            TP = count(res == counts).int().sum()
-            FP = N - TN
+            N = counts.shape[0] - P
+            TP = counts[res == counts].sum()
             TN = (res == counts).int().sum() - TP
+            FP = N - TN
             FN = P - TP
-            acc = TP + TN / counts.shape[0]
+            acc = (TP + TN) / counts.shape[0]
             precision = TP / (TP + FP)
             recall = TP / P
             F1 = 2 * precision * recall / (precision + recall)
