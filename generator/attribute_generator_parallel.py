@@ -273,7 +273,7 @@ def process_pattern(p, new_pattern_dir, pattern, attr_num, attr_range, constants
     
     return variable_literals, constant_literals
 
-def process_graph(p, g, new_pattern_dir, new_graph_dir, new_metadata_dir, variable_literals, constant_literals, pattern, graph, meta, attr_num, attr_range, constants, variables):
+def process_graph(p, g, new_pattern_dir, new_graph_dir, new_metadata_dir, variable_literals, constant_literals, pattern, graph, meta, attr_num, attr_range, constants, variables, fixed=False):
     #print("process {:d} start".format(os.getpid()))
     #generate attributes for graph
     counts = 0
@@ -349,27 +349,28 @@ def process_graph(p, g, new_pattern_dir, new_graph_dir, new_metadata_dir, variab
                     counts += 1
                     literal_isos.append(subisomorphism)
                     union |= set(subisomorphism)
-    #fixed a pair of vertices, and judge if has matches
-    fixed_counts, mapping, fixed_isos = set_fixed_vertices(pattern, graph, literal_isos)
+                    
     #write to new data file
     os.makedirs(os.path.join(new_graph_dir, p), exist_ok=True)
-    os.makedirs(os.path.join(new_metadata_dir, p), exist_ok=True)
-    os.makedirs(os.path.join(new_metadata_dir + "_fixed", p), exist_ok=True)
-    
-    #pattern.write(os.path.join(new_pattern_dir, p + ".gml"))
-    graph.write(os.path.join(new_graph_dir, p, g + ".gml"))
-    
+    os.makedirs(os.path.join(new_metadata_dir + "literal", p), exist_ok=True)
+    graph.write(os.path.join(new_graph_dir, p, g + ".gml"))        
     with open(os.path.join(new_metadata_dir,p ,g + ".meta"), "w") as f:
         json.dump({"counts": counts, "subisomorphisms": literal_isos}, f)
-    with open(os.path.join(new_metadata_dir + "_fixed",p ,g +'.meta'), "w") as f:
-        json.dump({"counts": fixed_counts, "subisomorphisms": fixed_isos, "mapping": mapping}, f)
-    #print("process {:d} end".format(os.getpid()))
+    if fixed:
+        os.makedirs(os.path.join(new_metadata_dir + "_fixed", p), exist_ok=True)
+        #fixed a pair of vertices, and judge if has matches
+        fixed_counts, mapping, fixed_isos = set_fixed_vertices(pattern, graph, literal_isos)
+        #pattern.write(os.path.join(new_pattern_dir, p + ".gml"))
+        with open(os.path.join(new_metadata_dir + "_fixed",p ,g +'.meta'), "w") as f:
+            json.dump({"counts": fixed_counts, "subisomorphisms": fixed_isos, "mapping": mapping}, f)
+        #print("process {:d} end".format(os.getpid()))
+        # with open(os.path.join(new_pattern_dir, p + ".literals"), "w") as f:
+        #     json.dump({"constant literals": constant_literals, "variable literals": variable_literals} , f)
     return g
-    # with open(os.path.join(new_pattern_dir, p + ".literals"), "w") as f:
-    #     json.dump({"constant literals": constant_literals, "variable literals": variable_literals} , f)
+
 
 attr_name = ["A", "B", "C", "D", "E"]
-def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, new_graph_dir, new_metadata_dir, attr_num, attr_range, constants, variables, num_workers=32):
+def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, new_graph_dir, new_metadata_dir, attr_num, attr_range, constants, variables, fixed, num_workers=32):
     patterns = read_patterns_from_dir(pattern_dir, num_workers=num_workers)
     graphs = read_graphs_from_dir(graph_dir, num_workers=num_workers)
     meta = read_metadata_from_dir(metadata_dir, num_workers=num_workers)
@@ -383,23 +384,24 @@ def generate_attributes(graph_dir, pattern_dir, metadata_dir, new_pattern_dir, n
                 for g, graph in graphs[p].items():
                     #print(p)
                     #process_graph(p, g, new_pattern_dir, new_graph_dir, new_metadata_dir, variable_literals, constant_literals, graph, meta[p][g], attr_num, attr_range, constants, variables)
-                    res.append(pool.apply_async(process_graph, args=(p, g, new_pattern_dir, new_graph_dir, new_metadata_dir, variable_literals, constant_literals, pattern, graph, meta[p][g], attr_num, attr_range, constants, variables, )))
+                    res.append(pool.apply_async(process_graph, args=(p, g, new_pattern_dir, new_graph_dir, new_metadata_dir, variable_literals, constant_literals, pattern, graph, meta[p][g], attr_num, attr_range, constants, variables, fixed, )))
                 for r in res:
                     r.get()
                
 
 
 config = {
-    "pattern_dir": "../data/small_alphas/patterns",
-    "graph_dir": "../data/small_alphas/graphs",
-    "meta_dir": "../data/small_alphas/metadata",
-    "new_pattern_dir": "../data/small_alphas_0.8/patterns",
-    "new_graph_dir": "../data/small_alphas_0.8/graphs",
-    "new_meta_dir": "../data/small_alphas_0.8/metadata",
+    "pattern_dir": "../data/great_large/patterns",
+    "graph_dir": "../data/great_large/graphs",
+    "meta_dir": "../data/great_large/metadata",
+    "new_pattern_dir": "../data/great_large_0.8/patterns",
+    "new_graph_dir": "../data/great_large_0.8/graphs",
+    "new_meta_dir": "../data/great_large_0.8/metadata",
     "attr_num": 5,
     "attr_range": "8,8,8,8,8",
     "constants": 1,
-    "variables": 2
+    "variables": 2,
+    "fixed": False
 }
 
 if __name__ == "__main__":
@@ -425,4 +427,4 @@ if __name__ == "__main__":
     config["variables"] = int(config["variables"])
     generate_attributes(config["graph_dir"], config["pattern_dir"], config["meta_dir"], 
         config["new_pattern_dir"], config["new_graph_dir"], config["new_meta_dir"],
-        config["attr_num"], config["attr_range"], config["constants"], config["variables"])
+        config["attr_num"], config["attr_range"], config["constants"], config["variables"], config["fixed"])
