@@ -86,7 +86,7 @@ LARGE_CONFIG = {
 GREAT_LARGE_CONFIG = {
     "max_subgraph": 512,
 
-    "alphas": [0.1],
+    "alphas": [0.01],
     
     "number_of_patterns": 1,
     "number_of_pattern_vertices": [8],
@@ -95,15 +95,15 @@ GREAT_LARGE_CONFIG = {
     "number_of_pattern_edge_labels": [8],
 
     "number_of_graphs": 1, # train:dev:test = 8:1:1
-    "number_of_graph_vertices": [65536],
-    "number_of_graph_edges": [262144],
+    "number_of_graph_vertices": [655360],
+    "number_of_graph_edges": [2621440],
     "number_of_graph_vertex_labels": [16],
     "number_of_graph_edge_labels": [16],
 
     "max_ratio_of_edges_vertices": 4,
-    "max_pattern_counts": 4096,
+    "max_pattern_counts": 40960,
 
-    "save_data_dir": r"../data/great_large",
+    "save_data_dir": r"../data/greater_large",
     "num_workers": 48
 }
 
