@@ -352,9 +352,9 @@ def process_graph(p, g, new_pattern_dir, new_graph_dir, new_metadata_dir, variab
                     
     #write to new data file
     os.makedirs(os.path.join(new_graph_dir, p), exist_ok=True)
-    os.makedirs(os.path.join(new_metadata_dir + "literal", p), exist_ok=True)
+    os.makedirs(os.path.join(new_metadata_dir + "_literal", p), exist_ok=True)
     graph.write(os.path.join(new_graph_dir, p, g + ".gml"))        
-    with open(os.path.join(new_metadata_dir,p ,g + ".meta"), "w") as f:
+    with open(os.path.join(new_metadata_dir + "_literal", p ,g + ".meta"), "w") as f:
         json.dump({"counts": counts, "subisomorphisms": literal_isos}, f)
     if fixed:
         os.makedirs(os.path.join(new_metadata_dir + "_fixed", p), exist_ok=True)

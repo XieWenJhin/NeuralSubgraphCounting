@@ -84,6 +84,128 @@ finetune_config = {
     "load_model_dir": "../dumps/middle/XXXX"
 }
 
+def evaluate(model, data_type, data_loader, device, config, epoch, logger=None, writer=None):
+    epoch_step = len(data_loader) #iteration
+    total_step = config["epochs"] * epoch_step #itotal iteration
+    total_reg_loss = 0
+    total_bp_loss = 0
+    total_cnt = 1e-6
+
+    evaluate_results = {"data": {"id": list(), "counts": list(), "pred": list()},
+        "error": {"mae": INF, "mse": INF},
+        "time": {"avg": list(), "total": 0.0}}
+
+    if config["reg_loss"] == "MAE":
+        reg_crit = lambda pred, target: F.l1_loss(F.relu(pred), target, reduce="none")
+    elif config["reg_loss"] == "MSE":
+        reg_crit = lambda pred, target: F.mse_loss(F.relu(pred), target, reduce="none")
+    elif config["reg_loss"] == "SMSE":
+        reg_crit = lambda pred, target: F.smooth_l1_loss(F.relu(pred), target, reduce="none")
+    elif config["reg_loss"] == "BCE": 
+        reg_crit = lambda pred, target: F.binary_cross_entropy_with_logits(pred, target, reduce="none")
+    else:
+        raise NotImplementedError
+
+    if config["bp_loss"] == "MAE":
+        bp_crit = lambda pred, target, neg_slp: F.l1_loss(F.leaky_relu(pred, neg_slp), target, reduce="none")
+    elif config["bp_loss"] == "MSE":
+        bp_crit = lambda pred, target, neg_slp: F.mse_loss(F.leaky_relu(pred, neg_slp), target, reduce="none")
+    elif config["bp_loss"] == "SMSE":
+        bp_crit = lambda pred, target, neg_slp: F.smooth_l1_loss(F.leaky_relu(pred, neg_slp), target, reduce="none")
+    elif config["bp_loss"] == "BCE":
+        bp_crit = lambda pred, target: F.binary_cross_entropy_with_logits(pred, target, reduce="none")
+    else:
+        raise NotImplementedError
+
+    model.eval()
+
+    with torch.no_grad():
+        for batch_id, batch in enumerate(data_loader):
+            ids, pattern, pattern_len, graph, graph_len, counts = batch
+            cnt = counts.shape[0]
+            total_cnt += cnt
+
+            evaluate_results["data"]["id"].extend(ids)
+            evaluate_results["data"]["counts"].extend(counts.view(-1).tolist())
+
+            pattern.to(device)
+            graph.to(device)
+            pattern_len, graph_len, counts = pattern_len.to(device), graph_len.to(device), counts.to(device)
+
+            # d = torch.ones(counts.numel()).reshape(counts.shape)
+            # d = d.to(device)
+            # d = d - counts
+            # label = torch.cat([d,counts],dim = 1)
+
+            st = time.time()
+            pred = model(pattern, pattern_len, graph, graph_len)
+            #pred = torch.clamp(pred, min = -10, max = 10)
+            et = time.time()
+            evaluate_results["time"]["total"] += (et-st)
+            avg_t = (et-st) / (cnt + 1e-8)
+            evaluate_results["time"]["avg"].extend([avg_t]*cnt)
+            evaluate_results["data"]["pred"].extend(pred.cpu().view(-1).tolist())
+
+            # counts = counts.long()
+            # counts = counts.reshape(1,-1).squeeze(dim=0)
+            reg_loss = reg_crit(pred, counts)
+            
+            if isinstance(config["bp_loss_slp"], (int, float)):
+                neg_slp = float(config["bp_loss_slp"])
+            else:
+                bp_loss_slp, l0, l1 = config["bp_loss_slp"].rsplit("$", 3)
+                neg_slp = anneal_fn(bp_loss_slp, batch_id+epoch*epoch_step, T=total_step//4, lambda0=float(l0), lambda1=float(l1))
+            bp_loss = bp_crit(pred, counts)
+            
+            reg_loss_item = reg_loss.mean().item()
+            bp_loss_item = bp_loss.mean().item()
+            total_reg_loss += reg_loss_item * cnt
+            total_bp_loss += bp_loss_item * cnt
+            
+            #evaluate
+            sigmoid = torch.nn.Sigmoid()
+            res = (sigmoid(pred) > 0.5).int()
+            P = counts.sum()
+            N = counts.shape[0] - P
+            TP = counts[res == counts].sum()
+            TN = (res == counts).int().sum() - TP
+            FP = N - TN
+            FN = P - TP
+            acc = (TP + TN) / counts.shape[0]
+            precision = TP / (TP + FP)
+            recall = TP / P
+            F1 = 2 * precision * recall / (precision + recall)
+            #print(ids)
+            #print("pred: ", pred)
+            #print("counts: ", counts)
+            print("batch id: {:0>3d}\tacc: {:.3f}\tprecision: {:.3f}\trecall: {:.3f}\tF1: {:.3f}".format(batch_id, acc, precision, recall, F1))
+
+            #evaluate_results["error"]["mae"] += F.l1_loss(F.relu(pred), counts, reduce="none").sum().item()
+            #evaluate_results["error"]["mse"] += F.mse_loss(F.relu(pred), counts, reduce="none").sum().item()
+
+            if writer:
+                writer.add_scalar("%s/REG-%s" % (data_type, config["reg_loss"]), reg_loss_item, epoch*epoch_step+batch_id)
+                writer.add_scalar("%s/BP-%s" % (data_type, config["bp_loss"]), bp_loss_item, epoch*epoch_step+batch_id)
+
+            if logger and batch_id == epoch_step-1:
+                logger.info("epoch: {:0>3d}/{:0>3d}\tdata_type: {:<5s}\tbatch: {:0>5d}/{:0>5d}\treg loss: {:0>10.3f}\tbp loss: {:0>16.3f}\tground: {:.3f}\tpredict: {:.3f}".format(
+                    epoch, config["epochs"], data_type, batch_id, epoch_step,
+                    reg_loss_item, bp_loss_item,
+                    counts[0].item(), sigmoid(pred)[0].item()))
+        mean_reg_loss = total_reg_loss/total_cnt
+        mean_bp_loss = total_bp_loss/total_cnt
+        if writer:
+            writer.add_scalar("%s/REG-%s-epoch" % (data_type, config["reg_loss"]), mean_reg_loss, epoch)
+            writer.add_scalar("%s/BP-%s-epoch" % (data_type, config["bp_loss"]), mean_bp_loss, epoch)
+        if logger:
+            logger.info("epoch: {:0>3d}/{:0>3d}\tdata_type: {:<5s}\treg loss: {:0>10.3f}\tbp loss: {:0>16.3f}".format(
+                epoch, config["epochs"], data_type, mean_reg_loss, mean_bp_loss))
+
+        #evaluate_results["error"]["mae"] = evaluate_results["error"]["mae"] / total_cnt
+        #evaluate_results["error"]["mse"] = evaluate_results["error"]["mse"] / total_cnt
+
+    gc.collect()
+    return mean_reg_loss, mean_bp_loss, evaluate_results
 if __name__ == "__main__":
     torch.manual_seed(0)
     np.random.seed(0)
