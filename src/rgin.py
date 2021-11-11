@@ -204,7 +204,7 @@ class RGIN(GraphAdjModel):
             del self.p_net
             self.p_net = p_net
 
-    def forward(self, pattern, pattern_len, graph, graph_len, anchors, inference = False):
+    def forward(self, pattern, pattern_len, graph, graph_len, anchors = None, inference = False):
         bsz = pattern_len.size(0)
 
         gate = self.get_filter_gate(pattern, pattern_len, graph, graph_len)
