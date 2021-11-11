@@ -204,9 +204,9 @@ def train(model, optimizer, scheduler, data_type, data_loader, device, config, e
         FP = N - TN
         FN = P - TP
         acc = (TP + TN) / counts.shape[0]
-        precision = TP / (TP + FP)
-        recall = TP / P
-        F1 = 2 * precision * recall / (precision + recall)
+        precision = TP / (TP + FP + 1e-6)
+        recall = TP / (P + 1e-6)
+        F1 = 2 * precision * recall / (precision + recall + 1e-6)
         #print(ids)
         #print("pred: ", pred)
         #print("counts: ", counts)
@@ -331,9 +331,9 @@ def evaluate(model, data_type, data_loader, device, config, epoch, logger=None, 
             FP = N - TN
             FN = P - TP
             acc = (TP + TN) / counts.shape[0]
-            precision = TP / (TP + FP)
-            recall = TP / P
-            F1 = 2 * precision * recall / (precision + recall)
+            precision = TP / (TP + FP + 1e-6)
+            recall = TP / (P + 1e-6)
+            F1 = 2 * precision * recall / (precision + recall + 1e-6)
             #print(ids)
             #print("pred: ", pred)
             #print("counts: ", counts)

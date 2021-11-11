@@ -204,7 +204,7 @@ class RGIN(GraphAdjModel):
             del self.p_net
             self.p_net = p_net
 
-    def forward(self, pattern, pattern_len, graph, graph_len):
+    def forward(self, pattern, pattern_len, graph, graph_len, anchors, inference = False):
         bsz = pattern_len.size(0)
 
         gate = self.get_filter_gate(pattern, pattern_len, graph, graph_len)
@@ -241,12 +241,26 @@ class RGIN(GraphAdjModel):
             pattern_output = torch.cat([pattern_output, pattern.ndata["indeg"].unsqueeze(-1)], dim=1)
             graph_output = torch.cat([graph_output, graph.ndata["indeg"].unsqueeze(-1)], dim=1)
 
-        p_u_emb = pattern_output[(pattern.ndata["w"] == 1)[:,0],]
-        p_v_emb = pattern_output[(pattern.ndata["w"] == 2)[:,0],]
-        g_u_emb = graph_output[((graph.ndata["w"] == 1) + (graph.ndata["w"] == 3))[:,0],]
-        g_v_emb = graph_output[((graph.ndata["w"] == 2) + (graph.ndata["w"] == 3))[:,0],]
-        
-        y = F.relu(self.fc1(torch.cat([p_u_emb, p_v_emb, g_u_emb, g_v_emb], dim=1)))
-        pred = self.fc2(y)
-        
-        return pred
+
+        if inference:
+            p_u_emb = pattern_output[0,]
+            p_v_emb = pattern_output[1,]
+            preds = list()
+            for anchor in anchors:
+                g_u_emb = graph_out[anchor[0],]
+                g_v_emb = graph_out[anchor[1],]
+                y = F.relu(self.fc1(torch.cat([p_u_emb, p_v_emb, g_u_emb, g_v_emb], dim=1)))
+                pred = self.fc2(y)
+                preds.append(pred)
+            preds = torch.tensor(preds, dtype=torch.int)
+            return preds
+        else:
+            p_u_emb = pattern_output[(pattern.ndata["w"] == 1)[:,0],]
+            p_v_emb = pattern_output[(pattern.ndata["w"] == 2)[:,0],]
+            g_u_emb = graph_output[((graph.ndata["w"] == 1) + (graph.ndata["w"] == 3))[:,0],]
+            g_v_emb = graph_output[((graph.ndata["w"] == 2) + (graph.ndata["w"] == 3))[:,0],]
+            
+            y = F.relu(self.fc1(torch.cat([p_u_emb, p_v_emb, g_u_emb, g_v_emb], dim=1)))
+            pred = self.fc2(y)
+            
+            return pred
